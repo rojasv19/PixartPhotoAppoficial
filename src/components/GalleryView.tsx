@@ -883,7 +883,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       }`}>
                         <div className="flex items-center gap-2 text-[11px] font-semibold text-blue-500">
                           <Camera className="w-3 h-3" />
-                          <span>Respuesta del Estudio Lumina:</span>
+                          <span>Respuesta de Pixart Photo:</span>
                         </div>
                         <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                           {item.photographerReply}

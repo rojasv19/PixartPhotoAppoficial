@@ -11,7 +11,7 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
     pinTitle: 'Acceso por PIN de Sesión',
     pinSubtitle: 'Introduce el código numérico de tu sesión fotográfica',
     emailLabel: 'Usuario o Correo:',
-    emailPlaceholder: 'admin@luminastudio.com o tu correo',
+    emailPlaceholder: 'Correo',
     passwordLabel: 'Contraseña:',
     passwordPlaceholder: '••••••••',
     pinLabel: 'Código PIN de tu Sesión:',
@@ -56,7 +56,7 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
     nameLabel: 'Nombre Completo:',
     namePlaceholder: 'Ej. Sofía Valenzuela',
     emailLabel: 'Correo Electrónico:',
-    emailPlaceholder: 'cliente@ejemplo.com',
+    emailPlaceholder: 'Correo',
     roleLabel: 'Rol en el Sistema:',
     phoneLabel: 'Teléfono / WhatsApp:',
     phonePlaceholder: '+34 600 000 000',
@@ -71,11 +71,11 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
   },
   uploadModal: {
     title: 'Subir Nueva Fotografía',
-    subtitle: 'Almacena archivos RAW o JPEG de alta resolución en el servidor de Lumina',
+    subtitle: 'Almacena archivos RAW o JPEG de alta resolución en el servidor de Pixart Photo',
     dropzoneTitle: 'Arrastra o selecciona una foto desde tu dispositivo',
     dropzoneHint: 'Compatible con RAW (.CR3, .ARW, .NEF), JPEG, PNG y WebP',
     titleInputLabel: 'Título / Nombre del Archivo:',
-    titleInputPlaceholder: 'Ej. LUM_9821_RETRATO_NOVIOS.CR3',
+    titleInputPlaceholder: 'Ej. PIX_9821_RETRATO_NOVIOS.CR3',
     tagsInputLabel: 'Etiquetas / Metadatos (separadas por coma):',
     tagsInputPlaceholder: 'RAW, Retrato, Master 4K',
     submitButtonText: 'Subir Fotografía al Servidor'
@@ -108,19 +108,19 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
 };
 
 export const DEFAULT_BRANDING: StudioBrandingConfig = {
-  studioName: 'LUMINA STUDIO',
-  studioTagline: 'Galerías Privadas & Almacenamiento RAW',
-  studioBadgeText: 'PRO',
-  logoType: 'icon',
+  studioName: 'Pixart',
+  studioTagline: 'Galerias Privadas',
+  studioBadgeText: 'Photo Pro',
+  logoType: 'image',
   logoIcon: 'Camera',
-  logoImageUrl: '',
+  logoImageUrl: '/logo-pixart.svg',
 
-  colorPreset: 'blue',
-  customPrimaryColor: '#2563eb',
+  colorPreset: 'violet',
+  customPrimaryColor: '#8b5cf6',
   fontHeadingStyle: 'serif',
   borderRadiusStyle: 'smooth',
 
-  portalHeroBadge: 'Lumina Studio Pro • Plataforma Fotográfica',
+  portalHeroBadge: 'Pixart Photo • Plataforma Fotográfica',
   portalHeroTitle: 'Galerías fotográficas privadas en',
   portalHeroHighlight: 'máxima resolución.',
   portalHeroSubtitle: 'Visualización, selección de favoritas y descarga directa en alta fidelidad RAW y 4K con almacenamiento seguro.',
@@ -140,18 +140,18 @@ export const DEFAULT_BRANDING: StudioBrandingConfig = {
 
   watermarkEnabled: true,
   watermarkType: 'text',
-  watermarkText: '© LUMINA STUDIO • PREVIEW',
+  watermarkText: '© PIXART PHOTO • PREVIEW',
   watermarkImageUrl: '',
   watermarkOpacity: 30,
   watermarkPosition: 'bottom-right',
 
-  footerStudioName: 'LUMINA STUDIO PRO',
-  footerTagline: 'Plataforma de Galerías Privadas & Almacenamiento Profesional',
-  contactEmail: 'hola@luminastudio.com',
-  contactPhone: '+34 910 882 120',
-  contactAddress: 'Paseo de la Castellana 45, Madrid',
-  instagramHandle: '@luminastudiopro',
-  websiteUrl: 'https://luminastudio.com',
+  footerStudioName: 'Pixart Photo',
+  footerTagline: 'Galerias Privadas & Almacenamiento Profesional',
+  contactEmail: 'info@somospixart.com',
+  contactPhone: '+584120174583',
+  contactAddress: 'Torre BEL, Av. Los Leones, Barquisimeto, Lara',
+  instagramHandle: '@somospixart',
+  websiteUrl: 'https://somospixart.com',
   copyrightYear: '2026',
 
   allowClientDownloads: true,
@@ -161,7 +161,7 @@ export const DEFAULT_BRANDING: StudioBrandingConfig = {
   modalTexts: DEFAULT_MODAL_TEXTS,
 };
 
-const BRANDING_STORAGE_KEY = 'lumina_studio_branding_v1';
+const BRANDING_STORAGE_KEY = 'pixart_branding_v2';
 
 export function loadBrandingFromStorage(): StudioBrandingConfig {
   try {
@@ -216,7 +216,7 @@ export function updateDocumentFaviconAndTitle(branding: StudioBrandingConfig): v
 
     // 3. If a custom image logo is provided and used, apply it directly as favicon
     if (branding.logoType === 'image' && branding.logoImageUrl) {
-      link.type = 'image/png';
+      link.type = branding.logoImageUrl.includes('.svg') || branding.logoImageUrl.startsWith('data:image/svg') ? 'image/svg+xml' : 'image/png';
       link.href = branding.logoImageUrl;
     } else {
       // Generate clean vector SVG favicon matching active brand color & icon

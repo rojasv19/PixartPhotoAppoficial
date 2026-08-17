@@ -96,15 +96,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className={`text-lg font-bold tracking-tight flex items-center gap-1.5 font-sans ${
                 isHomeView ? 'text-white drop-shadow-sm' : isDark ? 'text-white' : 'text-slate-900'
               }`}>
-                {branding?.studioName || 'LUMINA STUDIO'}
+                {branding?.studioName || 'Pixart'}
                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider backdrop-blur-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}>
-                  {branding?.studioBadgeText || 'PRO'}
+                  {branding?.studioBadgeText || 'Photo Pro'}
                 </span>
               </span>
               <p className={`text-[11px] -mt-0.5 tracking-normal ${
                 isHomeView ? 'text-slate-200/80 drop-shadow-xs' : isDark ? 'text-slate-400' : 'text-slate-500'
               }`}>
-                {branding?.studioTagline || 'Galerías Privadas & Almacenamiento RAW'}
+                {branding?.studioTagline || 'Galerias Privadas'}
               </p>
             </div>
           </div>

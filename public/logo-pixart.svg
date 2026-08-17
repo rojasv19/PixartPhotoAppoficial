@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <clipPath id="circle-clip">
+      <circle cx="250" cy="250" r="235" />
+    </clipPath>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="250" cy="250" r="235" fill="#1b121e" />
+  
+  <!-- Top-right lime green square -->
+  <rect x="292" y="96" width="80" height="74" rx="2" fill="#9cd400" />
+  
+  <!-- Stylized white Pixart 'X' glyph -->
+  <path d="M 112 100 L 202 100 L 402 385 L 306 385 L 246 298 L 204 385 L 108 385 L 194 224 Z" fill="#ffffff" />
+</svg>

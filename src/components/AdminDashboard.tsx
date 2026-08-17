@@ -1495,7 +1495,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span className={`text-[10px] uppercase font-bold tracking-widest ${
                     isDark ? 'text-amber-400' : 'text-blue-600'
                   }`}>
-                    Almacenamiento del Servidor Lumina
+                    Almacenamiento del Servidor Pixart Photo
                   </span>
                   <h3 className={`text-2xl font-bold font-serif-display mt-1 ${
                     isDark ? 'text-stone-100' : 'text-slate-900'
@@ -1686,7 +1686,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </td>
 
                           <td className={`px-4 py-3 font-sans ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                            {parentGal?.title || 'Sesión Lumina'}
+                            {parentGal?.title || 'Sesión Pixart Photo'}
                           </td>
 
                           <td className={`px-4 py-3 font-bold ${
@@ -1758,7 +1758,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Matriz de Permisos & Seguridad del Sistema
                 </h3>
                 <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                  Nivel de acceso por rol dentro de la plataforma Lumina Studio.
+                  Nivel de acceso por rol dentro de la plataforma Pixart Photo.
                 </p>
               </div>
 

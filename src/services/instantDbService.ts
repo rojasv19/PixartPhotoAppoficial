@@ -163,7 +163,7 @@ export async function seedInitialDataIfEmpty(
     }
 
     await db.transact(transactions);
-    console.log('InstantDB successfully seeded with Lumina Studio data');
+    console.log('InstantDB successfully seeded with Pixart Photo data');
     return true;
   } catch (error) {
     console.error('Failed to seed InstantDB initial data:', error);

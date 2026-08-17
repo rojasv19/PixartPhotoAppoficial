@@ -1662,7 +1662,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 id="branding-hero-badge-input"
                 value={formData.portalHeroBadge}
                 onChange={(e) => handleFieldChange('portalHeroBadge', e.target.value)}
-                placeholder="Ej. Lumina Studio Pro • Plataforma Fotográfica"
+                placeholder="Ej. Pixart Photo • Plataforma Fotográfica"
                 className={`w-full text-xs rounded-xl p-3 border focus:ring-2 focus:outline-none ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}
@@ -2062,7 +2062,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 type="email"
                 value={formData.contactEmail}
                 onChange={(e) => handleFieldChange('contactEmail', e.target.value)}
-                placeholder="contacto@luminastudio.com"
+                placeholder="info@somospixart.com"
                 className={`w-full text-xs rounded-xl p-3 border ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}
@@ -2077,7 +2077,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 type="text"
                 value={formData.contactPhone}
                 onChange={(e) => handleFieldChange('contactPhone', e.target.value)}
-                placeholder="+34 910 882 120"
+                placeholder="+584120174583"
                 className={`w-full text-xs rounded-xl p-3 border ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}
@@ -2092,7 +2092,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 type="text"
                 value={formData.instagramHandle}
                 onChange={(e) => handleFieldChange('instagramHandle', e.target.value)}
-                placeholder="@luminastudiopro"
+                placeholder="@somospixart"
                 className={`w-full text-xs rounded-xl p-3 border ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}
@@ -2107,7 +2107,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 type="text"
                 value={formData.contactAddress}
                 onChange={(e) => handleFieldChange('contactAddress', e.target.value)}
-                placeholder="Paseo de la Castellana 45, Madrid"
+                placeholder="Torre BEL, Av. Los Leones, Barquisimeto, Lara"
                 className={`w-full text-xs rounded-xl p-3 border ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}
@@ -2122,7 +2122,7 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 type="url"
                 value={formData.websiteUrl}
                 onChange={(e) => handleFieldChange('websiteUrl', e.target.value)}
-                placeholder="https://luminastudio.com"
+                placeholder="https://somospixart.com"
                 className={`w-full text-xs rounded-xl p-3 border ${
                   isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                 }`}

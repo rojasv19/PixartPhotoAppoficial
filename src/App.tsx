@@ -196,12 +196,12 @@ export default function App() {
 
   // Theme Management (Light / Dark mode)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('lumina_theme');
+    const saved = localStorage.getItem('pixart_theme');
     return (saved as 'light' | 'dark') || 'dark';
   });
 
   useEffect(() => {
-    localStorage.setItem('lumina_theme', theme);
+    localStorage.setItem('pixart_theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -636,7 +636,7 @@ export default function App() {
       galleryTitle: parentGal?.title,
       imageId: newImage.id,
       imageUrl: newImage.url,
-      actorName: currentUser?.name || 'Estudio Lumina',
+      actorName: currentUser?.name || 'Pixart Photo',
       actorAvatar: currentUser?.avatar,
       linkView: 'gallery',
     });
@@ -798,31 +798,65 @@ export default function App() {
       </main>
 
       {/* Global Studio Footer */}
-      <footer className={`border-t py-6 text-xs transition-colors ${
+      <footer className={`border-t py-8 text-xs transition-colors ${
         theme === 'dark' ? 'border-slate-800 bg-[#141618] text-slate-400' : 'border-slate-200 bg-white text-slate-500'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className={`font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {branding.studioName}
-            </span>
-            <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}>
-              — {branding.footerCopyrightText || 'Plataforma de Galerías Privadas & Almacenamiento Profesional'}
-            </span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left">
+              <span className={`font-bold tracking-tight text-sm ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {branding.studioName}
+              </span>
+              <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}>
+                — {branding.studioTagline || 'Galerias Privadas'}
+              </span>
+            </div>
+            
+            {/* Contact details row */}
+            <div className="flex flex-wrap items-center justify-center gap-3 text-[11px]">
+              {branding.contactEmail && (
+                <a href={`mailto:${branding.contactEmail}`} className="hover:underline text-violet-400">
+                  {branding.contactEmail}
+                </a>
+              )}
+              {branding.contactPhone && (
+                <>
+                  <span className="text-slate-600 dark:text-slate-700">•</span>
+                  <span>{branding.contactPhone}</span>
+                </>
+              )}
+              {branding.instagramHandle && (
+                <>
+                  <span className="text-slate-600 dark:text-slate-700">•</span>
+                  <span className="font-medium">{branding.instagramHandle}</span>
+                </>
+              )}
+              {branding.websiteUrl && (
+                <>
+                  <span className="text-slate-600 dark:text-slate-700">•</span>
+                  <a href={branding.websiteUrl.startsWith('http') ? branding.websiteUrl : `https://${branding.websiteUrl}`} target="_blank" rel="noreferrer" className="hover:underline text-violet-400">
+                    {branding.websiteUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                </>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className={`flex items-center gap-1.5 font-mono-code px-2 py-0.5 rounded border ${
-              theme === 'dark' ? 'text-slate-300 bg-slate-900 border-slate-800' : 'text-slate-600 bg-slate-100 border-slate-200'
-            }`}>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-              InstantDB: {APP_ID.slice(0, 8)}...
-            </span>
-            <span>Cuota: <strong className={`font-mono-code ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{formatBytes(serverStats.usedBytes)} / {formatBytes(serverStats.totalCapacityBytes)}</strong></span>
-            <span className="text-slate-500">•</span>
-            <span className="text-emerald-500 font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              InstantDB Cloud Synced
-            </span>
+
+          <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+            <div className="text-slate-500 text-center sm:text-left">
+              {branding.contactAddress && <span>{branding.contactAddress} • </span>}
+              <span>© {branding.copyrightYear || '2026'} {branding.studioName}. Todos los derechos reservados.</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className={`flex items-center gap-1.5 font-mono-code px-2 py-0.5 rounded border ${
+                theme === 'dark' ? 'text-slate-300 bg-slate-900 border-slate-800' : 'text-slate-600 bg-slate-100 border-slate-200'
+              }`}>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                InstantDB Synced
+              </span>
+              <span>Cuota: <strong className={`font-mono-code ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{formatBytes(serverStats.usedBytes)} / {formatBytes(serverStats.totalCapacityBytes)}</strong></span>
+            </div>
           </div>
         </div>
       </footer>

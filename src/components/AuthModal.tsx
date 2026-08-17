@@ -191,13 +191,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {modalTexts.emailLabel || 'Usuario o Correo:'}
               </label>
               <div className="relative">
-                <input
+                  <input
                   id="auth-admin-email-input"
                   type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={modalTexts.emailPlaceholder || 'admin@luminastudio.com o tu correo'}
+                  placeholder={modalTexts.emailPlaceholder || 'Correo'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -305,7 +305,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={modalTexts.emailPlaceholder || 'sofia.valenzuela@gmail.com o tu correo'}
+                      placeholder={modalTexts.emailPlaceholder || 'Correo'}
                       className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                         isDark 
                           ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 

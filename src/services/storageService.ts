@@ -3,13 +3,13 @@ import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, A
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  USERS: 'lumina_users_v1',
-  GALLERIES: 'lumina_galleries_v1',
-  IMAGES: 'lumina_images_v1',
-  LOGS: 'lumina_logs_v1',
-  NOTIFICATIONS: 'lumina_notifications_v1',
-  CURRENT_USER: 'lumina_auth_user_v1',
-  SERVER_QUOTA: 'lumina_server_quota_v1',
+  USERS: 'pixart_users_v2',
+  GALLERIES: 'pixart_galleries_v2',
+  IMAGES: 'pixart_images_v2',
+  LOGS: 'pixart_logs_v2',
+  NOTIFICATIONS: 'pixart_notifications_v2',
+  CURRENT_USER: 'pixart_auth_user_v2',
+  SERVER_QUOTA: 'pixart_server_quota_v2',
 };
 
 export const DEFAULT_SERVER_QUOTA_BYTES = 1 * 1024 * 1024 * 1024; // 1 GB (1,073,741,824 bytes)
@@ -116,7 +116,7 @@ export async function downloadImagesAsZip(
   onProgress?: (percent: number, currentFileName: string) => void
 ): Promise<boolean> {
   const zip = new JSZip();
-  const folderName = `LuminaStudio_${galleryTitle.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const folderName = `PixartPhoto_${galleryTitle.replace(/[^a-zA-Z0-9]/g, '_')}`;
   const imgFolder = zip.folder(folderName) || zip;
 
   let loadedCount = 0;

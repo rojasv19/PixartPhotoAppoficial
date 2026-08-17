@@ -34,11 +34,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     nameLabel: 'Nombre Completo *',
     namePlaceholder: 'Ej: Sofia Valenzuela',
     emailLabel: 'Correo Electrónico *',
-    emailPlaceholder: 'usuario@estudio.com',
+    emailPlaceholder: 'Correo',
     phoneLabel: 'Teléfono / WhatsApp',
     phonePlaceholder: '+34 600 000 000',
     companyLabel: 'Empresa / Razón Social',
-    companyPlaceholder: 'Lumina Pro / Particular',
+    companyPlaceholder: 'Pixart Photo / Particular',
     passwordLabel: 'Contraseña de Acceso',
     passwordPlaceholder: 'Introduce una contraseña segura',
     notesLabel: 'Notas / Biografía del Usuario',
@@ -323,7 +323,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  placeholder={modalTexts.companyPlaceholder || 'Lumina Pro / Particular'}
+                  placeholder={modalTexts.companyPlaceholder || 'Pixart Photo / Particular'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
