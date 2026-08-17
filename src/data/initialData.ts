@@ -1,5 +1,5 @@
 import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, AppNotification } from '../types';
-import { PHOTOGRAPHY_AVATAR_PRESETS } from './photographyAvatars';
+import { DEFAULT_PROFILE_AVATAR } from './photographyAvatars';
 
 export const INITIAL_USERS: User[] = [
   {
@@ -8,7 +8,7 @@ export const INITIAL_USERS: User[] = [
     email: 'admin@luminastudio.com',
     password: 'admin2026',
     role: 'admin',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[0].url, // Mirrorless Pro
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 612 345 678',
     company: 'Lumina Studio Pro',
     assignedGalleryIds: ['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'],
@@ -25,7 +25,7 @@ export const INITIAL_USERS: User[] = [
     email: 'elena@luminastudio.com',
     password: 'fotografo2026',
     role: 'photographer',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[1].url, // Aperture f/1.2
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 688 990 112',
     company: 'Lumina Studio Pro',
     assignedGalleryIds: ['gal-wedding-1', 'gal-editorial-2'],
@@ -42,7 +42,7 @@ export const INITIAL_USERS: User[] = [
     email: 'sofia.valenzuela@gmail.com',
     password: 'boda2024',
     role: 'client',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[2].url, // Cinema Camera
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 655 432 198',
     company: 'Clientes Particulares',
     assignedGalleryIds: ['gal-wedding-1'],
@@ -60,7 +60,7 @@ export const INITIAL_USERS: User[] = [
     email: 'valeria@hautemode.es',
     password: 'moda2024',
     role: 'client',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[3].url, // Clapperboard
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 677 889 001',
     company: 'Vogue & Haute Mode Magazine',
     assignedGalleryIds: ['gal-editorial-2'],
@@ -78,7 +78,7 @@ export const INITIAL_USERS: User[] = [
     email: 'comms@nexustech.io',
     password: 'nexus2024',
     role: 'client',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[7].url, // Aerial Drone
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 910 223 344',
     company: 'Nexus Tech Global',
     assignedGalleryIds: ['gal-corp-4'],
@@ -96,7 +96,7 @@ export const INITIAL_USERS: User[] = [
     email: 'isabella@fontanadesign.com',
     password: 'fontana2024',
     role: 'client',
-    avatar: PHOTOGRAPHY_AVATAR_PRESETS[8].url, // Ring Light
+    avatar: DEFAULT_PROFILE_AVATAR,
     phone: '+34 611 778 990',
     company: 'Fontana Interior Design',
     assignedGalleryIds: ['gal-portrait-3'],
@@ -673,7 +673,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     galleryId: 'gal-wedding-1',
     galleryTitle: 'Sofía & Mateo — Enlace en Hacienda Los Olivos',
     actorName: 'Sofía & Mateo Valenzuela',
-    actorAvatar: PHOTOGRAPHY_AVATAR_PRESETS[2].url,
+    actorAvatar: DEFAULT_PROFILE_AVATAR,
     timestamp: 'Hace 10 minutos',
     readBy: [],
     linkView: 'admin-favorites',
@@ -687,7 +687,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     galleryId: 'gal-editorial-2',
     galleryTitle: 'Haute Mode — Colección Velvet & Shadows',
     actorName: 'Alejandro Sterling',
-    actorAvatar: PHOTOGRAPHY_AVATAR_PRESETS[0].url,
+    actorAvatar: DEFAULT_PROFILE_AVATAR,
     timestamp: 'Hace 45 minutos',
     readBy: [],
     linkView: 'gallery',
@@ -701,7 +701,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     galleryId: 'gal-editorial-2',
     galleryTitle: 'Haute Mode — Colección Velvet & Shadows',
     actorName: 'Valeria Mendoza',
-    actorAvatar: PHOTOGRAPHY_AVATAR_PRESETS[3].url,
+    actorAvatar: DEFAULT_PROFILE_AVATAR,
     timestamp: 'Hace 2 horas',
     readBy: [],
     linkView: 'admin-galleries',
@@ -715,7 +715,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     galleryId: 'gal-corp-4',
     galleryTitle: 'Nexus Tech Global — Leadership Summit',
     actorName: 'Nexus Tech Global',
-    actorAvatar: PHOTOGRAPHY_AVATAR_PRESETS[7].url,
+    actorAvatar: DEFAULT_PROFILE_AVATAR,
     timestamp: 'Hace 3 horas',
     readBy: ['usr-admin-1'],
     linkView: 'admin-storage',
@@ -730,7 +730,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     galleryId: 'gal-portrait-3',
     galleryTitle: 'Isabella Fontana — Retratos de Autor',
     actorName: 'Lumina Studio Pro',
-    actorAvatar: PHOTOGRAPHY_AVATAR_PRESETS[0].url,
+    actorAvatar: DEFAULT_PROFILE_AVATAR,
     timestamp: 'Ayer',
     readBy: [],
     linkView: 'gallery',

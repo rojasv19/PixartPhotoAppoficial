@@ -13,6 +13,7 @@ import {
   loadGalleriesFromStorage, saveGalleriesToStorage,
   loadImagesFromStorage, saveImagesToStorage,
   loadLogsFromStorage, saveLogsToStorage,
+  loadNotificationsFromStorage, saveNotificationsToStorage,
   loadStoredAuthUser, saveStoredAuthUser,
   loadServerQuotaFromStorage, saveServerQuotaToStorage,
   calculateServerStats,
@@ -136,67 +137,10 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
 
   // App Notifications System
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem('lumina_notifications');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse notifications from storage', e);
-      }
-    }
-    return [
-      {
-        id: 'notif-demo-1',
-        title: 'Nueva Selección de Favoritas',
-        message: 'Sofía & Mateo han seleccionado fotografías favoritas para retoque en su sesión de Boda.',
-        type: 'favorite',
-        targetRole: 'admin',
-        galleryId: 'gal-wedding-1',
-        galleryTitle: 'Boda Sofía & Mateo — Hacienda San José',
-        actorName: 'Sofía Valenzuela',
-        actorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        timestamp: 'Hace 15 min',
-        readBy: [],
-        linkView: 'admin-favorites',
-      },
-      {
-        id: 'notif-demo-2',
-        title: 'Comentarios de Retoque Recibidos',
-        message: 'Valeria Mendoza ha enviado notas de edición para la sesión Haute Couture.',
-        type: 'feedback',
-        targetRole: 'admin',
-        galleryId: 'gal-editorial-1',
-        galleryTitle: 'Haute Couture Editorial — Valeria Mendoza',
-        actorName: 'Valeria Mendoza',
-        actorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
-        timestamp: 'Hace 1 hora',
-        readBy: [],
-        linkView: 'admin-favorites',
-      },
-      {
-        id: 'notif-demo-3',
-        title: 'Nuevas Fotos Disponibles',
-        message: 'El fotógrafo ha subido fotografías en alta resolución a tu galería privada.',
-        type: 'upload',
-        targetRole: 'client',
-        galleryId: 'gal-wedding-1',
-        galleryTitle: 'Boda Sofía & Mateo — Hacienda San José',
-        actorName: 'Carlos Lumina',
-        actorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-        timestamp: 'Hace 3 horas',
-        readBy: [],
-        linkView: 'gallery',
-      }
-    ];
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotificationsFromStorage());
 
   useEffect(() => {
-    try {
-      localStorage.setItem('lumina_notifications', JSON.stringify(notifications));
-    } catch (e) {
-      console.error('Failed to save notifications', e);
-    }
+    saveNotificationsToStorage(notifications);
   }, [notifications]);
 
   const handleMarkNotificationAsRead = (notificationId: string) => {
