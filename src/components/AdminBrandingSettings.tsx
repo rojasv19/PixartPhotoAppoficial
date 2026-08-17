@@ -566,120 +566,122 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
         </div>
       </div>
 
-      {/* SUB-TABS NAVIGATION FOR CONFIGURATION SECTIONS */}
-      <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-2xl border transition-colors ${
+      {/* SUB-TABS NAVIGATION FOR CONFIGURATION SECTIONS (4 top row, 4 bottom row, 100% width) */}
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 p-2 rounded-2xl border w-full transition-colors ${
         isDark ? 'bg-[#181A1D] border-slate-800' : 'bg-white border-slate-200'
       }`}>
+        {/* ROW 1: Tabs 1 to 4 */}
         <button
           type="button"
           id="config-tab-identity"
           onClick={() => setActiveSubTab('identity')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'identity'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Camera className="w-4 h-4" />
-          <span>1. Identidad & Logotipo</span>
+          <Camera className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">1. Identidad & Logotipo</span>
         </button>
 
         <button
           type="button"
           id="config-tab-heromedia"
           onClick={() => setActiveSubTab('heroMedia')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'heroMedia'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Film className="w-4 h-4" />
-          <span>2. Fondo Hero & Multimedia (Foto / Video / Overlay)</span>
+          <Film className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">2. Fondo Hero & Multimedia</span>
         </button>
 
         <button
           type="button"
           id="config-tab-colors"
           onClick={() => setActiveSubTab('colors')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'colors'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Palette className="w-4 h-4" />
-          <span>3. Colores & Estilo</span>
+          <Palette className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">3. Colores & Estilo</span>
         </button>
 
         <button
           type="button"
           id="config-tab-texts"
           onClick={() => setActiveSubTab('texts')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'texts'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Type className="w-4 h-4" />
-          <span>4. Títulos & Textos del Portal</span>
+          <Type className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">4. Títulos & Textos</span>
         </button>
 
+        {/* ROW 2: Tabs 5 to 8 */}
         <button
           type="button"
           id="config-tab-watermark"
           onClick={() => setActiveSubTab('watermark')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'watermark'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Shield className="w-4 h-4" />
-          <span>5. Marca de Agua (Watermark)</span>
+          <Shield className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">5. Marca de Agua (Watermark)</span>
         </button>
 
         <button
           type="button"
           id="config-tab-footer"
           onClick={() => setActiveSubTab('footer')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'footer'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Mail className="w-4 h-4" />
-          <span>6. Pie de Página & Contacto</span>
+          <Mail className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">6. Pie de Página & Contacto</span>
         </button>
 
         <button
           type="button"
           id="config-tab-experience"
           onClick={() => setActiveSubTab('experience')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'experience'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <Sliders className="w-4 h-4" />
-          <span>7. Experiencia & Permisos</span>
+          <Sliders className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">7. Experiencia & Permisos</span>
         </button>
 
         <button
           type="button"
           id="config-tab-modals"
           onClick={() => setActiveSubTab('modals')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center text-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold w-full transition-all cursor-pointer ${
             activeSubTab === 'modals'
               ? `${activeColorTheme.twBg} text-white shadow-md`
-              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              : isDark ? 'text-slate-300 hover:text-white hover:bg-slate-800/80 bg-slate-900/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70'
           }`}
         >
-          <SlidersHorizontal className="w-4 h-4" />
-          <span>8. Ventanas y Modales</span>
+          <SlidersHorizontal className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">8. Ventanas y Modales</span>
         </button>
       </div>
 

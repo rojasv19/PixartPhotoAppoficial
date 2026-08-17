@@ -6,6 +6,26 @@ export interface PhotographyAvatarPreset {
   url: string;
 }
 
+// Default standard clean avatar for Lumina Studio users
+export const DEFAULT_PROFILE_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg-lumina-avatar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="lumina-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="58" fill="url(#bg-lumina-avatar)" stroke="url(#lumina-ring)" stroke-width="2.5"/>
+  <circle cx="60" cy="46" r="18" fill="#334155" stroke="#64748b" stroke-width="2"/>
+  <path d="M28 98 C28 76 42 66 60 66 C78 66 92 76 92 98 Z" fill="#334155" stroke="#64748b" stroke-width="2"/>
+  <circle cx="60" cy="46" r="8" fill="#64748b" opacity="0.3"/>
+</svg>
+`)}`;
+
 // Crisp, high-contrast photography & video themed vector avatars
 export const PHOTOGRAPHY_AVATAR_PRESETS: PhotographyAvatarPreset[] = [
   {

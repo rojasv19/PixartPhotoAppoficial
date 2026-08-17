@@ -21,6 +21,7 @@ import {
 import {
   loadBrandingFromStorage,
   saveBrandingToStorage,
+  updateDocumentFaviconAndTitle,
   COLOR_PRESET_MAP
 } from './services/brandingService';
 import {
@@ -235,6 +236,10 @@ export default function App() {
 
   // Studio Branding & Customization State
   const [branding, setBranding] = useState<StudioBrandingConfig>(() => loadBrandingFromStorage());
+
+  useEffect(() => {
+    updateDocumentFaviconAndTitle(branding);
+  }, [branding]);
 
   const handleSaveBranding = (updated: StudioBrandingConfig) => {
     setBranding(updated);

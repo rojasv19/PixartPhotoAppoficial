@@ -199,6 +199,68 @@ export function saveBrandingToStorage(config: StudioBrandingConfig): void {
   }
 }
 
+export function updateDocumentFaviconAndTitle(branding: StudioBrandingConfig): void {
+  try {
+    // 1. Update Title
+    if (branding.studioName) {
+      document.title = `${branding.studioName} — Plataforma de Fotografía & Galerías Privadas`;
+    }
+
+    // 2. Find or create favicon link element
+    let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+
+    // 3. If a custom image logo is provided and used, apply it directly as favicon
+    if (branding.logoType === 'image' && branding.logoImageUrl) {
+      link.type = 'image/png';
+      link.href = branding.logoImageUrl;
+    } else {
+      // Generate clean vector SVG favicon matching active brand color & icon
+      const themeColors: Record<ColorPreset, string> = {
+        blue: '#2563eb',
+        amber: '#f59e0b',
+        emerald: '#10b981',
+        rose: '#f43f5e',
+        violet: '#8b5cf6',
+        indigo: '#6366f1',
+        cyan: '#06b6d4',
+        slate: '#475569'
+      };
+      const bgColor = branding.customPrimaryColor || themeColors[branding.colorPreset] || '#2563eb';
+      
+      let iconSvgInner = '<path d="M9 13.5V23a2 2 0 002 2h10a2 2 0 002-2v-9.5a2 2 0 00-2-2h-1.5l-1-2h-5l-1 2H11a2 2 0 00-2 2z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="16" cy="18" r="3.5" stroke="#ffffff" stroke-width="2" fill="none"/>';
+
+      if (branding.logoIcon === 'Aperture') {
+        iconSvgInner = '<circle cx="16" cy="16" r="8" stroke="#ffffff" stroke-width="2" fill="none"/><line x1="19.5" y1="8.5" x2="12.5" y2="23.5" stroke="#ffffff" stroke-width="2"/><line x1="8.5" y1="12.5" x2="23.5" y2="19.5" stroke="#ffffff" stroke-width="2"/><line x1="12.5" y1="8.5" x2="19.5" y2="23.5" stroke="#ffffff" stroke-width="2"/>';
+      } else if (branding.logoIcon === 'Crown') {
+        iconSvgInner = '<path d="M8 22h16l2-12-6 4-4-6-4 6-6-4 2 12z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
+      } else if (branding.logoIcon === 'Sparkles') {
+        iconSvgInner = '<path d="M16 7l2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5 2.5-6z" stroke="#ffffff" stroke-width="2" fill="none"/>';
+      } else if (branding.logoIcon === 'Film') {
+        iconSvgInner = '<rect x="8" y="9" width="16" height="14" rx="2" stroke="#ffffff" stroke-width="2" fill="none"/><line x1="8" y1="13" x2="24" y2="13" stroke="#ffffff" stroke-width="1.5"/><line x1="8" y1="19" x2="24" y2="19" stroke="#ffffff" stroke-width="1.5"/><line x1="13" y1="9" x2="13" y2="13" stroke="#ffffff" stroke-width="1.5"/><line x1="19" y1="9" x2="19" y2="13" stroke="#ffffff" stroke-width="1.5"/><line x1="13" y1="19" x2="13" y2="23" stroke="#ffffff" stroke-width="1.5"/><line x1="19" y1="19" x2="19" y2="23" stroke="#ffffff" stroke-width="1.5"/>';
+      } else if (branding.logoIcon === 'Flame') {
+        iconSvgInner = '<path d="M16 7c2 3 5 5 5 10a5 5 0 01-10 0c0-3 2-6 5-10z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
+      } else if (branding.logoIcon === 'Heart') {
+        iconSvgInner = '<path d="M16 23s-7-4.5-7-10a4 4 0 017-2.5 4 4 0 017 2.5c0 5.5-7 10-7 10z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
+      }
+
+      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+        <rect width="32" height="32" rx="8" fill="${bgColor}"/>
+        ${iconSvgInner}
+      </svg>`;
+
+      link.type = 'image/svg+xml';
+      link.href = `data:image/svg+xml,${encodeURIComponent(svgString)}`;
+    }
+  } catch (error) {
+    console.error('Failed to update document favicon:', error);
+  }
+}
+
 // Color Preset theme dictionary for consistent styling classes and hexes
 export const COLOR_PRESET_MAP: Record<ColorPreset, {
   name: string;

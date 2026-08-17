@@ -8,7 +8,7 @@ import {
 import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig } from '../types';
 import { formatBytes, calculateServerStats } from '../services/storageService';
 import { COLOR_PRESET_MAP, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
-import { PHOTOGRAPHY_AVATAR_PRESETS } from '../data/photographyAvatars';
+import { DEFAULT_PROFILE_AVATAR } from '../data/photographyAvatars';
 import { AdminBrandingSettings } from './AdminBrandingSettings';
 import { AdminFavoritesView } from './AdminFavoritesView';
 
@@ -2394,32 +2394,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-bold block ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
-                    Fotografía de Perfil / Avatar del Cliente:
+                    Fotografía de Perfil / Avatar:
                   </span>
-                  {clientAvatar && (
+                  {clientAvatar && clientAvatar !== DEFAULT_PROFILE_AVATAR && (
                     <button
                       type="button"
-                      onClick={() => setClientAvatar('')}
-                      className="text-xs text-rose-400 hover:text-rose-300 cursor-pointer"
+                      onClick={() => setClientAvatar(DEFAULT_PROFILE_AVATAR)}
+                      className="text-xs text-rose-400 hover:text-rose-300 cursor-pointer transition-colors"
                     >
-                      Quitar
+                      Restablecer predeterminado
                     </button>
                   )}
                 </div>
 
                 <div className="flex items-center gap-4">
                   <div className="relative shrink-0">
-                    {clientAvatar ? (
-                      <img 
-                        src={clientAvatar} 
-                        alt="Avatar Preview" 
-                        className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/60 shadow-md"
-                      />
-                    ) : (
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white ${colorTheme.twBg} shadow-md`}>
-                        {clientName ? clientName.charAt(0).toUpperCase() : <Users className="w-6 h-6" />}
-                      </div>
-                    )}
+                    <img 
+                      src={clientAvatar || DEFAULT_PROFILE_AVATAR} 
+                      alt="Avatar Preview" 
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/60 shadow-md"
+                      onError={() => setClientAvatar('')}
+                    />
                   </div>
 
                   <div className="flex-1 space-y-2">
@@ -2434,7 +2429,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="button"
                       id="upload-client-avatar-device-btn"
                       onClick={() => clientAvatarInputRef.current?.click()}
-                      className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-bold shadow-md cursor-pointer transition-all ${colorTheme.twBg} ${colorTheme.twBgHover}`}
+                      className={`w-full flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-bold shadow-md cursor-pointer transition-all ${colorTheme.twBg} ${colorTheme.twBgHover}`}
                     >
                       <Upload className="w-4 h-4" />
                       <span>Subir Foto de Perfil desde tu Dispositivo</span>
@@ -2444,38 +2439,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="url"
                       value={clientAvatar}
                       onChange={(e) => setClientAvatar(e.target.value)}
-                      placeholder="O escribe URL de foto https://..."
+                      placeholder="O escribe URL de foto (https://...)"
                       className={`w-full border rounded-xl px-3 py-1.5 text-xs focus:outline-none ${
                         isDark ? 'bg-stone-900 border-stone-700 text-stone-100' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     />
-                  </div>
-                </div>
-
-                {/* Photography & Video Presets Quick Row */}
-                <div className="space-y-1.5 pt-1">
-                  <span className={`text-[11px] font-medium block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    O elige un avatar temático de fotografía & video:
-                  </span>
-                  <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-                    {PHOTOGRAPHY_AVATAR_PRESETS.map((preset) => {
-                      const isSelected = clientAvatar === preset.url;
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          onClick={() => setClientAvatar(preset.url)}
-                          title={`${preset.name} (${preset.categoryLabel})`}
-                          className={`relative w-8 h-8 rounded-full overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
-                            isSelected
-                              ? `${colorTheme.twBorder} ring-2 ${colorTheme.twRing} scale-110`
-                              : isDark ? 'border-stone-800 hover:border-stone-600 opacity-80 hover:opacity-100' : 'border-slate-300 hover:border-slate-400 opacity-80 hover:opacity-100'
-                          }`}
-                        >
-                          <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
               </div>
