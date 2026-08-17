@@ -1,0 +1,6 @@
+{
+  "name": "Lumina Lens - Plataforma de Fotografía y Galerías",
+  "description": "Plataforma profesional para estudios de fotografía con gestión de clientes, galerías privadas de alta resolución, selección de favoritos, feedback y control de almacenamiento.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
