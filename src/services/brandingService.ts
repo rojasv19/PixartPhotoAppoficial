@@ -108,9 +108,9 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
 };
 
 export const DEFAULT_BRANDING: StudioBrandingConfig = {
-  studioName: 'Pixart',
+  studioName: 'Somos Pixart',
   studioTagline: 'Galerias Privadas',
-  studioBadgeText: 'Photo Pro',
+  studioBadgeText: 'Photo',
   logoType: 'image',
   logoIcon: 'Camera',
   logoImageUrl: '/logo-pixart.svg',
@@ -120,7 +120,7 @@ export const DEFAULT_BRANDING: StudioBrandingConfig = {
   fontHeadingStyle: 'serif',
   borderRadiusStyle: 'smooth',
 
-  portalHeroBadge: 'Pixart Photo • Plataforma Fotográfica',
+  portalHeroBadge: 'Somos Pixart • Plataforma Fotográfica',
   portalHeroTitle: 'Galerías fotográficas privadas en',
   portalHeroHighlight: 'máxima resolución.',
   portalHeroSubtitle: 'Visualización, selección de favoritas y descarga directa en alta fidelidad RAW y 4K con almacenamiento seguro.',
@@ -140,12 +140,12 @@ export const DEFAULT_BRANDING: StudioBrandingConfig = {
 
   watermarkEnabled: true,
   watermarkType: 'text',
-  watermarkText: '© PIXART PHOTO • PREVIEW',
+  watermarkText: '© SOMOS PIXART • PREVIEW',
   watermarkImageUrl: '',
   watermarkOpacity: 30,
   watermarkPosition: 'bottom-right',
 
-  footerStudioName: 'Pixart Photo',
+  footerStudioName: 'Somos Pixart',
   footerTagline: 'Galerias Privadas & Almacenamiento Profesional',
   contactEmail: 'info@somospixart.com',
   contactPhone: '+584120174583',
@@ -161,7 +161,7 @@ export const DEFAULT_BRANDING: StudioBrandingConfig = {
   modalTexts: DEFAULT_MODAL_TEXTS,
 };
 
-const BRANDING_STORAGE_KEY = 'pixart_branding_v2';
+const BRANDING_STORAGE_KEY = 'somos_pixart_branding_v3';
 
 export function loadBrandingFromStorage(): StudioBrandingConfig {
   try {

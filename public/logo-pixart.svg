@@ -1,15 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
-  <defs>
-    <clipPath id="circle-clip">
-      <circle cx="250" cy="250" r="235" />
-    </clipPath>
-  </defs>
-  <!-- Background circle -->
-  <circle cx="250" cy="250" r="235" fill="#1b121e" />
-  
-  <!-- Top-right lime green square -->
-  <rect x="292" y="96" width="80" height="74" rx="2" fill="#9cd400" />
-  
-  <!-- Stylized white Pixart 'X' glyph -->
-  <path d="M 112 100 L 202 100 L 402 385 L 306 385 L 246 298 L 204 385 L 108 385 L 194 224 Z" fill="#ffffff" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Solid Dark Plum Background -->
+  <rect width="512" height="512" fill="#201524" />
+
+  <!-- Purple Square Top-Left -->
+  <rect x="85" y="160" width="40" height="37" fill="#9153ee" />
+
+  <!-- Letter 'p' (Solid Stem + Solid Disc) -->
+  <g fill="#ffffff">
+    <!-- Left vertical stem extending downwards -->
+    <rect x="137" y="160" width="44" height="190" />
+    <!-- Solid circular bowl -->
+    <circle cx="222" cy="233" r="73" />
+  </g>
+
+  <!-- Letter 'x' (White crossed bars + Green square) -->
+  <g fill="#ffffff">
+    <!-- Top-left to bottom-right diagonal arm -->
+    <polygon points="280,160 318,160 424,303 386,303" />
+    <!-- Bottom-left to top-right diagonal arm -->
+    <polygon points="274,303 312,303 376,217 338,217" />
+  </g>
+
+  <!-- Lime Green Square Top-Right -->
+  <rect x="376" y="160" width="40" height="37" fill="#a0d725" />
+
+  <!-- Faint "PHOTO" branding underneath (matching the original) -->
+  <text x="256" y="372" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="9" fill="#271a2c" opacity="0.9">PHOTO</text>
 </svg>

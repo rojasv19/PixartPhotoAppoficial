@@ -194,14 +194,14 @@ export default function App() {
     );
   };
 
-  // Theme Management (Light / Dark mode)
+  // Theme Management (Light / Dark mode - Default is Light)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('pixart_theme');
-    return (saved as 'light' | 'dark') || 'dark';
+    const saved = localStorage.getItem('somos_pixart_theme');
+    return (saved as 'light' | 'dark') || 'light';
   });
 
   useEffect(() => {
-    localStorage.setItem('pixart_theme', theme);
+    localStorage.setItem('somos_pixart_theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -848,14 +848,8 @@ export default function App() {
               <span>© {branding.copyrightYear || '2026'} {branding.studioName}. Todos los derechos reservados.</span>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className={`flex items-center gap-1.5 font-mono-code px-2 py-0.5 rounded border ${
-                theme === 'dark' ? 'text-slate-300 bg-slate-900 border-slate-800' : 'text-slate-600 bg-slate-100 border-slate-200'
-              }`}>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                InstantDB Synced
-              </span>
-              <span>Cuota: <strong className={`font-mono-code ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{formatBytes(serverStats.usedBytes)} / {formatBytes(serverStats.totalCapacityBytes)}</strong></span>
+            <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500">
+              <span>{branding.studioTagline || 'Galerias Privadas'}</span>
             </div>
           </div>
         </div>

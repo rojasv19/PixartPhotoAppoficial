@@ -2,12 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Camera, ShieldCheck, LogOut, HardDrive, KeyRound, 
   Sparkles, LayoutDashboard, Image as ImageIcon, Users, 
-  Sun, Moon, Database, Palette, User as UserIcon, ChevronDown,
+  Sun, Moon, Palette, User as UserIcon, ChevronDown,
   Settings, ExternalLink, Check, Heart
 } from 'lucide-react';
 import { User, ServerStorageStats, StudioBrandingConfig, AppNotification } from '../types';
 import { formatBytes } from '../services/storageService';
-import { APP_ID } from '../lib/instant';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { BrandIcon } from './BrandIcon';
 import { NotificationsPopover } from './NotificationsPopover';
@@ -47,7 +46,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onMarkAllNotificationsAsRead = () => {},
   onClearNotifications,
 }) => {
-  const [showDbInfo, setShowDbInfo] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -96,9 +94,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className={`text-lg font-bold tracking-tight flex items-center gap-1.5 font-sans ${
                 isHomeView ? 'text-white drop-shadow-sm' : isDark ? 'text-white' : 'text-slate-900'
               }`}>
-                {branding?.studioName || 'Pixart'}
+                {branding?.studioName || 'Somos Pixart'}
                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider backdrop-blur-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}>
-                  {branding?.studioBadgeText || 'Photo Pro'}
+                  {branding?.studioBadgeText || 'Photo'}
                 </span>
               </span>
               <p className={`text-[11px] -mt-0.5 tracking-normal ${
@@ -238,60 +236,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
               </button>
-            </div>
-
-            {/* InstantDB Live Status Badge */}
-            <div className="relative hidden sm:block">
-              <button
-                id="instantdb-status-btn"
-                onClick={() => setShowDbInfo(!showDbInfo)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium backdrop-blur-md transition-all cursor-pointer ${
-                  isHomeView
-                    ? 'bg-black/35 border-white/15 text-slate-200 hover:bg-white/15'
-                    : isDark 
-                      ? 'bg-slate-900/90 border-slate-700/80 hover:border-slate-500 text-slate-200' 
-                      : 'bg-slate-100/90 border-slate-200 hover:border-slate-400 text-slate-700'
-                }`}
-                title={`InstantDB App ID: ${APP_ID}`}
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isDbConnected ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isDbConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                </span>
-                <span className="font-mono-code text-[11px]">InstantDB</span>
-              </button>
-
-              {showDbInfo && (
-                <div 
-                  id="instantdb-info-popover"
-                  className={`absolute right-0 mt-2 w-72 rounded-2xl border shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 text-xs space-y-3 ${
-                    isDark ? 'bg-[#1A1C1E] border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Database className={`w-4 h-4 ${colorTheme.twText}`} />
-                      <span className="font-semibold">InstantDB Sync</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                      Conectado
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider block">App ID</span>
-                    <p className={`font-mono-code text-[11px] p-1.5 rounded-lg border break-all select-all mt-1 ${
-                      isDark ? `bg-slate-950 border-slate-800 ${colorTheme.twText}` : `bg-slate-50 border-slate-200 ${colorTheme.twText}`
-                    }`}>
-                      {APP_ID}
-                    </p>
-                  </div>
-                  <div className={`text-[11px] p-2.5 rounded-lg border ${
-                    isDark ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}>
-                    Sincronización multi-cliente en tiempo real activa.
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* User Profile Section & Interactive Dropdown */}

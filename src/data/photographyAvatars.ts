@@ -6,28 +6,44 @@ export interface PhotographyAvatarPreset {
   url: string;
 }
 
-// Default standard clean avatar for Pixart Photo users
+// Default standard clean avatar for Pixart Photo users - Exactly matching the uploaded brand asset
 export const DEFAULT_PROFILE_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <defs>
-    <linearGradient id="bg-pixart-avatar" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1322"/>
-      <stop offset="100%" stop-color="#0f0914"/>
-    </linearGradient>
-    <linearGradient id="pixart-ring" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#c084fc"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
-    </linearGradient>
-  </defs>
-  <circle cx="60" cy="60" r="58" fill="url(#bg-pixart-avatar)" stroke="url(#pixart-ring)" stroke-width="2.5"/>
-  <circle cx="60" cy="46" r="18" fill="#3b2d42" stroke="#7e608f" stroke-width="2"/>
-  <path d="M28 98 C28 76 42 66 60 66 C78 66 92 76 92 98 Z" fill="#3b2d42" stroke="#7e608f" stroke-width="2"/>
-  <circle cx="60" cy="46" r="8" fill="#7e608f" opacity="0.3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Solid Dark Plum Background -->
+  <rect width="512" height="512" fill="#201524" />
+
+  <!-- Purple Square Top-Left -->
+  <rect x="85" y="160" width="40" height="37" fill="#9153ee" />
+
+  <!-- Letter 'p' (Solid Stem + Solid Disc) -->
+  <g fill="#ffffff">
+    <rect x="137" y="160" width="44" height="190" />
+    <circle cx="222" cy="233" r="73" />
+  </g>
+
+  <!-- Letter 'x' (White crossed bars) -->
+  <g fill="#ffffff">
+    <polygon points="280,160 318,160 424,303 386,303" />
+    <polygon points="274,303 312,303 376,217 338,217" />
+  </g>
+
+  <!-- Lime Green Square Top-Right -->
+  <rect x="376" y="160" width="40" height="37" fill="#a0d725" />
+
+  <!-- Faint "PHOTO" branding underneath -->
+  <text x="256" y="372" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="9" fill="#271a2c" opacity="0.9">PHOTO</text>
 </svg>
 `)}`;
 
 // Crisp, high-contrast photography & video themed vector avatars
 export const PHOTOGRAPHY_AVATAR_PRESETS: PhotographyAvatarPreset[] = [
+  {
+    id: 'pixart-official',
+    name: 'Somos Pixart Oficial',
+    category: 'studio',
+    categoryLabel: 'Estudio & Branding',
+    url: DEFAULT_PROFILE_AVATAR,
+  },
   {
     id: 'cam-mirrorless',
     name: 'Cámara Mirrorless Pro',

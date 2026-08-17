@@ -153,7 +153,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
           
           <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}>
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{branding?.portalHeroBadge || 'Pixart Photo • Plataforma Fotográfica'}</span>
+            <span>{branding?.portalHeroBadge || 'Somos Pixart • Plataforma Fotográfica'}</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-serif-display leading-tight max-w-4xl mx-auto drop-shadow-md text-white">

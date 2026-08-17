@@ -3,13 +3,13 @@ import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, A
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  USERS: 'pixart_users_v2',
-  GALLERIES: 'pixart_galleries_v2',
-  IMAGES: 'pixart_images_v2',
-  LOGS: 'pixart_logs_v2',
-  NOTIFICATIONS: 'pixart_notifications_v2',
-  CURRENT_USER: 'pixart_auth_user_v2',
-  SERVER_QUOTA: 'pixart_server_quota_v2',
+  USERS: 'somos_pixart_users_v3',
+  GALLERIES: 'somos_pixart_galleries_v3',
+  IMAGES: 'somos_pixart_images_v3',
+  LOGS: 'somos_pixart_logs_v3',
+  NOTIFICATIONS: 'somos_pixart_notifications_v3',
+  CURRENT_USER: 'somos_pixart_auth_user_v3',
+  SERVER_QUOTA: 'somos_pixart_server_quota_v3',
 };
 
 export const DEFAULT_SERVER_QUOTA_BYTES = 1 * 1024 * 1024 * 1024; // 1 GB (1,073,741,824 bytes)
