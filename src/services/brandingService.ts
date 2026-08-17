@@ -11,7 +11,7 @@ export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
     pinTitle: 'Acceso por PIN de Sesión',
     pinSubtitle: 'Introduce el código numérico de tu sesión fotográfica',
     emailLabel: 'Usuario o Correo:',
-    emailPlaceholder: 'demo23 o correo admin',
+    emailPlaceholder: 'admin@luminastudio.com o tu correo',
     passwordLabel: 'Contraseña:',
     passwordPlaceholder: '••••••••',
     pinLabel: 'Código PIN de tu Sesión:',

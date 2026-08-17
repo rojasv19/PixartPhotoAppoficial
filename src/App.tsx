@@ -333,36 +333,15 @@ export default function App() {
     const input = emailOrUser.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // Universal 'demo23' credentials match
-    if (input === 'demo23' && (cleanPass === 'demo23' || cleanPass === 'admin' || cleanPass === '123456')) {
-      if (targetRole === 'client') {
-        const clientUser = users.find(u => u.role === 'client') || users[0];
-        if (clientUser) {
-          setCurrentUser(clientUser);
-          addAuditLog('Inicio de Sesión', `Cliente ${clientUser.name} accedió a la plataforma.`);
-          setCurrentView('home');
-          return true;
-        }
-      } else {
-        const adminUser = users.find(u => u.role === 'admin') || users[0];
-        if (adminUser) {
-          setCurrentUser(adminUser);
-          addAuditLog('Inicio de Sesión', `Administrador ${adminUser.name} accedió a la plataforma.`);
-          setCurrentView('admin');
-          return true;
-        }
-      }
-    }
-
-    // Direct search by email, username, or role
+    // Authenticate by user's email or username with their corresponding password
     const found = users.find(u => 
-      (u.email.toLowerCase() === input || u.name.toLowerCase() === input || (input === 'admin' && u.role === 'admin') || (input === 'cliente' && u.role === 'client') || input === 'demo23') &&
-      (u.password === cleanPass || cleanPass === 'demo23' || cleanPass === 'admin' || cleanPass === '123456')
+      (u.email.toLowerCase() === input || u.name.toLowerCase() === input) &&
+      u.password === cleanPass
     );
 
     if (found) {
       setCurrentUser(found);
-      addAuditLog('Inicio de Sesión', `Usuario ${found.name} accedió a la plataforma.`, undefined, { name: found.name, role: found.role });
+      addAuditLog('Inicio de Sesión', `Usuario ${found.name} (${found.email}) accedió a la plataforma.`, undefined, { name: found.name, role: found.role });
       if (found.role === 'admin' || found.role === 'photographer') {
         setCurrentView('admin');
       } else {

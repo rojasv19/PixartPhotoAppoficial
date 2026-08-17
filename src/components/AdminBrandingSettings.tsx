@@ -6,7 +6,7 @@ import {
   ExternalLink, Mail, Phone, MapPin, Instagram, Globe, HelpCircle,
   Copy, ArrowRight, ShieldCheck, Lock, Download, MessageSquare,
   Upload, Trash2, FileImage, Video, Play, SlidersHorizontal,
-  Key, Users, HardDrive, FolderPlus, UserPlus, ShieldAlert, Sparkle, Info
+  Key, Users, HardDrive, FolderPlus, UserPlus, ShieldAlert, Sparkle, Info, X
 } from 'lucide-react';
 import { StudioBrandingConfig, BrandIconName, ColorPreset, ModalTextsConfig } from '../types';
 import { COLOR_PRESET_MAP, DEFAULT_BRANDING, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
@@ -222,9 +222,24 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
   };
 
   const handleSave = () => {
-    onSaveBranding(formData);
+    const payload: StudioBrandingConfig = {
+      ...formData,
+      modalTexts: {
+        ...DEFAULT_MODAL_TEXTS,
+        ...(formData.modalTexts || {}),
+        authModal: { ...DEFAULT_MODAL_TEXTS.authModal, ...(formData.modalTexts?.authModal || {}) },
+        lockedGalleryModal: { ...DEFAULT_MODAL_TEXTS.lockedGalleryModal, ...(formData.modalTexts?.lockedGalleryModal || {}) },
+        galleryModal: { ...DEFAULT_MODAL_TEXTS.galleryModal, ...(formData.modalTexts?.galleryModal || {}) },
+        userModal: { ...DEFAULT_MODAL_TEXTS.userModal, ...(formData.modalTexts?.userModal || {}) },
+        uploadModal: { ...DEFAULT_MODAL_TEXTS.uploadModal, ...(formData.modalTexts?.uploadModal || {}) },
+        storageLimitModal: { ...DEFAULT_MODAL_TEXTS.storageLimitModal, ...(formData.modalTexts?.storageLimitModal || {}) },
+        feedbackReplyModal: { ...DEFAULT_MODAL_TEXTS.feedbackReplyModal, ...(formData.modalTexts?.feedbackReplyModal || {}) },
+        userProfileModal: { ...DEFAULT_MODAL_TEXTS.userProfileModal, ...(formData.modalTexts?.userProfileModal || {}) },
+      }
+    };
+    onSaveBranding(payload);
     setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3500);
+    setTimeout(() => setSavedSuccess(false), 4500);
   };
 
   const handleResetDefaults = () => {
@@ -232,12 +247,41 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
       setFormData(DEFAULT_BRANDING);
       onSaveBranding(DEFAULT_BRANDING);
       setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      setTimeout(() => setSavedSuccess(false), 3500);
     }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in duration-300 relative">
+
+      {/* Floating Global Success Toast Notification */}
+      {savedSuccess && (
+        <div 
+          id="branding-save-success-toast"
+          className="fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-2xl bg-emerald-950/95 border-2 border-emerald-500 text-white shadow-2xl backdrop-blur-md flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 flex-shrink-0 mt-0.5">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-emerald-300 font-serif-display">¡Guardado Exitoso!</h4>
+              <span className="text-[10px] font-mono-code bg-emerald-500/30 text-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                100% Sincronizado
+              </span>
+            </div>
+            <p className="text-xs text-emerald-100/90 leading-relaxed">
+              Todos los cambios de diseño, logotipos, colores y textos de las ventanas emergentes (modales) se han guardado y aplicado correctamente.
+            </p>
+          </div>
+          <button 
+            onClick={() => setSavedSuccess(false)}
+            className="text-emerald-400 hover:text-white p-1 transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       
       {/* Header with Title & Action Buttons */}
       <div className={`p-6 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${

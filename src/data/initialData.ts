@@ -6,7 +6,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-admin-1',
     name: 'Alejandro Sterling',
     email: 'admin@luminastudio.com',
-    password: 'demo23',
+    password: 'admin2026',
     role: 'admin',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[0].url, // Mirrorless Pro
     phone: '+34 612 345 678',
@@ -23,7 +23,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-photog-1',
     name: 'Elena Vance',
     email: 'elena@luminastudio.com',
-    password: 'demo23',
+    password: 'fotografo2026',
     role: 'photographer',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[1].url, // Aperture f/1.2
     phone: '+34 688 990 112',
@@ -40,7 +40,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-client-1',
     name: 'Sofía & Mateo Valenzuela',
     email: 'sofia.valenzuela@gmail.com',
-    password: 'demo23',
+    password: 'boda2024',
     role: 'client',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[2].url, // Cinema Camera
     phone: '+34 655 432 198',
@@ -58,7 +58,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-client-2',
     name: 'Valeria Mendoza — Haute Mode',
     email: 'valeria@hautemode.es',
-    password: 'demo23',
+    password: 'moda2024',
     role: 'client',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[3].url, // Clapperboard
     phone: '+34 677 889 001',
@@ -76,7 +76,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-client-3',
     name: 'Grupo Nexus Tech',
     email: 'comms@nexustech.io',
-    password: 'demo23',
+    password: 'nexus2024',
     role: 'client',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[7].url, // Aerial Drone
     phone: '+34 910 223 344',
@@ -94,7 +94,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-client-4',
     name: 'Isabella Fontana',
     email: 'isabella@fontanadesign.com',
-    password: 'demo23',
+    password: 'fontana2024',
     role: 'client',
     avatar: PHOTOGRAPHY_AVATAR_PRESETS[8].url, // Ring Light
     phone: '+34 611 778 990',

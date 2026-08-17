@@ -78,7 +78,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (success) {
       onClose();
     } else {
-      setAuthError('Credenciales no válidas. Por favor verifica tus datos de acceso.');
+      setAuthError(modalTexts.errorMessageCredentials || 'Credenciales no válidas. Por favor verifica tus datos de acceso.');
     }
   };
 
@@ -93,7 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (success) {
       onClose();
     } else {
-      setAuthError('Código PIN inválido. Verifica el código entregado por el fotógrafo.');
+      setAuthError(modalTexts.errorMessagePin || 'Código PIN inválido. Verifica el código entregado por el fotógrafo.');
     }
   };
 
@@ -129,13 +129,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div>
             <h3 className={`text-xl font-bold font-serif-display ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {activeTab === 'admin' 
-                ? (modalTexts.adminTabTitle || 'Acceso de Administrador') 
-                : (modalTexts.clientTabTitle || 'Portal de Clientes')}
+                ? (modalTexts.adminTitle || 'Acceso de Administrador') 
+                : (clientAccessType === 'pin' 
+                    ? (modalTexts.pinTitle || 'Acceso por PIN de Sesión') 
+                    : (modalTexts.clientTitle || 'Portal de Clientes'))}
             </h3>
             <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {activeTab === 'admin' 
-                ? (modalTexts.adminTabSubtitle || 'Panel de control, sesiones RAW y almacenamiento') 
-                : (modalTexts.clientTabSubtitle || 'Accede a tus galerías privadas en alta resolución')}
+                ? (modalTexts.adminSubtitle || 'Panel de control, sesiones RAW y almacenamiento') 
+                : (clientAccessType === 'pin'
+                    ? (modalTexts.pinSubtitle || 'Introduce el código numérico de tu sesión fotográfica')
+                    : (modalTexts.clientSubtitle || 'Accede a tus galerías privadas en alta resolución'))}
             </p>
           </div>
         </div>
@@ -158,7 +162,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{modalTexts.adminTabTitle || 'Administrador'}</span>
+            <span>{modalTexts.adminTabLabel || 'Administrador'}</span>
           </button>
 
           <button
@@ -175,7 +179,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>{modalTexts.clientTabTitle || 'Clientes'}</span>
+            <span>{modalTexts.clientTabLabel || 'Clientes'}</span>
           </button>
         </div>
 
@@ -184,7 +188,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <form onSubmit={handleLoginSubmit} className="space-y-4 animate-in fade-in duration-150">
             <div>
               <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                {modalTexts.usernameLabel || 'Usuario o Correo:'}
+                {modalTexts.emailLabel || 'Usuario o Correo:'}
               </label>
               <div className="relative">
                 <input
@@ -193,7 +197,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={modalTexts.usernamePlaceholder || 'demo23 o correo admin'}
+                  placeholder={modalTexts.emailPlaceholder || 'admin@luminastudio.com o tu correo'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -245,7 +249,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               id="submit-auth-admin-btn"
               className={`w-full py-3 rounded-xl text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
             >
-              <span>{modalTexts.adminLoginButtonText || 'Ingresar al Panel de Gestión'}</span>
+              <span>{modalTexts.submitLoginText || 'Iniciar Sesión'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -269,7 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                {modalTexts.clientSubTabPassword || 'Usuario & Contraseña'}
+                {modalTexts.passwordLabel ? 'Usuario & Contraseña' : 'Usuario & Contraseña'}
               </button>
               <button
                 type="button"
@@ -284,7 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                {modalTexts.clientSubTabPin || 'Código PIN'}
+                {modalTexts.pinTitle ? 'Código PIN' : 'Código PIN'}
               </button>
             </div>
 
@@ -292,7 +296,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <form onSubmit={handleLoginSubmit} className="space-y-3.5">
                 <div>
                   <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {modalTexts.usernameLabel || 'Usuario o Correo de Cliente:'}
+                    {modalTexts.emailLabel || 'Usuario o Correo de Cliente:'}
                   </label>
                   <div className="relative">
                     <input
@@ -301,7 +305,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={modalTexts.usernamePlaceholder || 'demo23 o tu correo'}
+                      placeholder={modalTexts.emailPlaceholder || 'sofia.valenzuela@gmail.com o tu correo'}
                       className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                         isDark 
                           ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -353,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   id="submit-auth-client-btn"
                   className={`w-full py-3 rounded-xl text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                 >
-                  <span>{modalTexts.clientLoginButtonText || 'Acceder a Mis Galerías'}</span>
+                  <span>{modalTexts.submitLoginText || 'Iniciar Sesión'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
@@ -362,7 +366,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="text-center space-y-1">
                   <KeyRound className={`w-7 h-7 mx-auto ${colorTheme.twText}`} />
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {modalTexts.pinDescription || 'Ingresa el PIN de seguridad proporcionado para tu sesión'}
+                    {modalTexts.pinSubtitle || 'Ingresa el PIN de seguridad proporcionado para tu sesión'}
                   </p>
                 </div>
 
@@ -373,7 +377,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     maxLength={8}
                     value={pinCode}
                     onChange={(e) => setPinCode(e.target.value)}
-                    placeholder={modalTexts.pinPlaceholder || 'Código PIN (ej: 8492)'}
+                    placeholder={modalTexts.pinPlaceholder || 'Código PIN (ej: 2024)'}
                     className={`w-full border rounded-xl px-4 py-3 text-center text-lg font-mono-code tracking-widest ${colorTheme.twText} focus:ring-2 ${colorTheme.twRing} focus:outline-none ${
                       isDark 
                         ? 'bg-slate-950 border-slate-700 placeholder:text-slate-600' 
@@ -393,7 +397,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   id="submit-auth-pin-btn"
                   className={`w-full py-3 rounded-xl text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                 >
-                  <span>{modalTexts.pinButtonText || 'Abrir Galería Privada'}</span>
+                  <span>{modalTexts.submitPinText || 'Acceder a la Galería'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>

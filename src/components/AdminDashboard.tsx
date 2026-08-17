@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig } from '../types';
 import { formatBytes, calculateServerStats } from '../services/storageService';
-import { COLOR_PRESET_MAP } from '../services/brandingService';
+import { COLOR_PRESET_MAP, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
 import { PHOTOGRAPHY_AVATAR_PRESETS } from '../data/photographyAvatars';
 import { AdminBrandingSettings } from './AdminBrandingSettings';
 import { AdminFavoritesView } from './AdminFavoritesView';
@@ -65,6 +65,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const isDark = theme === 'dark';
   const colorTheme = branding ? COLOR_PRESET_MAP[branding.colorPreset] || COLOR_PRESET_MAP.blue : COLOR_PRESET_MAP.blue;
+  const modalTexts = branding?.modalTexts || DEFAULT_MODAL_TEXTS;
+  const galleryModalTexts = modalTexts.galleryModal || DEFAULT_MODAL_TEXTS.galleryModal;
+  const userModalTexts = modalTexts.userModal || DEFAULT_MODAL_TEXTS.userModal;
+  const uploadModalTexts = modalTexts.uploadModal || DEFAULT_MODAL_TEXTS.uploadModal;
+  const storageLimitModalTexts = modalTexts.storageLimitModal || DEFAULT_MODAL_TEXTS.storageLimitModal;
+  const feedbackReplyModalTexts = modalTexts.feedbackReplyModal || DEFAULT_MODAL_TEXTS.feedbackReplyModal;
+
   const [activeTab, setActiveTab] = useState<'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding'>(initialTab);
 
   // Calculate favorite images count
@@ -1962,7 +1969,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h3 className={`text-xl font-bold font-serif-display ${
                   isDark ? 'text-stone-100' : 'text-slate-900'
                 }`}>
-                  {editingGallery ? 'Editar Sesión Fotográfica' : 'Configurar Nueva Sesión Fotográfica'}
+                  {editingGallery 
+                    ? (galleryModalTexts.titleEdit || 'Editar Sesión Fotográfica') 
+                    : (galleryModalTexts.titleNew || 'Configurar Nueva Sesión Fotográfica')}
                 </h3>
                 <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                   Ingresa los detalles del evento, fecha, ubicación y credenciales.
@@ -1985,7 +1994,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Title */}
                 <div className="sm:col-span-2 space-y-1">
                   <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    Título del Evento / Sesión:
+                    {galleryModalTexts.titleLabel || 'Título del Evento / Sesión:'}
                   </label>
                   <input
                     id="input-gallery-title"
@@ -1993,7 +2002,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     required
                     value={galleryTitle}
                     onChange={(e) => setGalleryTitle(e.target.value)}
-                    placeholder="Ej. Camila & David — Boda en Hacienda Real"
+                    placeholder={galleryModalTexts.titlePlaceholder || 'Ej. Camila & David — Boda en Hacienda Real'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
@@ -2005,7 +2014,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Category */}
                 <div className="space-y-1">
                   <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    Categoría de Fotografía:
+                    {galleryModalTexts.categoryLabel || 'Categoría de Fotografía:'}
                   </label>
                   <select
                     id="select-gallery-category"
@@ -2029,7 +2038,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Event Date */}
                 <div className="space-y-1">
                   <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    Fecha del Evento:
+                    {galleryModalTexts.dateLabel || 'Fecha del Evento:'}
                   </label>
                   <input
                     id="input-gallery-date"
@@ -2048,7 +2057,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Location */}
                 <div className="space-y-1">
                   <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    Ciudad / Región:
+                    {galleryModalTexts.locationLabel || 'Ciudad / Región:'}
                   </label>
                   <input
                     id="input-gallery-location"
@@ -2056,7 +2065,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     required
                     value={galleryLocation}
                     onChange={(e) => setGalleryLocation(e.target.value)}
-                    placeholder="Ej. Madrid / Palacio de Cristal"
+                    placeholder={galleryModalTexts.locationPlaceholder || 'Ej. Madrid / Palacio de Cristal'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
@@ -2068,7 +2077,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* PIN Code */}
                 <div className="space-y-1">
                   <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    PIN de Acceso Privado (4 dígitos):
+                    {galleryModalTexts.pinLabel || 'PIN de Acceso Privado (4 dígitos):'}
                   </label>
                   <input
                     id="input-gallery-pin"
@@ -2077,7 +2086,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     required
                     value={galleryPin}
                     onChange={(e) => setGalleryPin(e.target.value)}
-                    placeholder="2024"
+                    placeholder={galleryModalTexts.pinPlaceholder || '2024'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code font-bold focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-amber-300 focus:ring-amber-400' 
@@ -2342,7 +2351,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h3 className={`text-xl font-bold font-serif-display ${
                   isDark ? 'text-stone-100' : 'text-slate-900'
                 }`}>
-                  {editingUser ? 'Editar Permisos del Cliente' : 'Registrar Nuevo Cliente'}
+                  {editingUser 
+                    ? (userModalTexts.titleEdit || 'Editar Permisos del Cliente') 
+                    : (userModalTexts.titleNew || 'Registrar Nuevo Cliente')}
                 </h3>
                 <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>Configura accesos y permisos individuales a galerías.</p>
               </div>
@@ -2359,14 +2370,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <form onSubmit={handleSaveClient} className="space-y-4">
               <div className="space-y-1">
-                <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Nombre Completo del Cliente:</label>
+                <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                  {userModalTexts.nameLabel || 'Nombre Completo del Cliente:'}
+                </label>
                 <input
                   id="input-client-name"
                   type="text"
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Ej. Valeria Mendoza o Sofía Valenzuela"
+                  placeholder={userModalTexts.namePlaceholder || 'Ej. Valeria Mendoza o Sofía Valenzuela'}
                   className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                     isDark 
                       ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2469,14 +2482,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Correo Electrónico:</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {userModalTexts.emailLabel || 'Correo Electrónico:'}
+                  </label>
                   <input
                     id="input-client-email"
                     type="email"
                     required
                     value={clientEmail}
                     onChange={(e) => setClientEmail(e.target.value)}
-                    placeholder="cliente@email.com"
+                    placeholder={userModalTexts.emailPlaceholder || 'cliente@email.com'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2486,13 +2501,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Contraseña de Acceso:</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {userModalTexts.passwordLabel || 'Contraseña de Acceso:'}
+                  </label>
                   <input
                     id="input-client-password"
                     type="text"
                     value={clientPassword}
                     onChange={(e) => setClientPassword(e.target.value)}
-                    placeholder="cliente123"
+                    placeholder={userModalTexts.passwordPlaceholder || 'cliente123'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2504,13 +2521,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Teléfono / WhatsApp:</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {userModalTexts.phoneLabel || 'Teléfono / WhatsApp:'}
+                  </label>
                   <input
                     id="input-client-phone"
                     type="text"
                     value={clientPhone}
                     onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="+34 600 000 000"
+                    placeholder={userModalTexts.phonePlaceholder || '+34 600 000 000'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2520,13 +2539,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Empresa / Categoría:</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {userModalTexts.companyLabel || 'Empresa / Categoría:'}
+                  </label>
                   <input
                     id="input-client-company"
                     type="text"
                     value={clientCompany}
                     onChange={(e) => setClientCompany(e.target.value)}
-                    placeholder="Ej. Boda Privada o Editorial"
+                    placeholder={userModalTexts.companyPlaceholder || 'Ej. Boda Privada o Editorial'}
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2635,7 +2656,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   id="save-client-submit-btn"
                   className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                 >
-                  {editingUser ? 'Guardar Permisos' : 'Crear Cliente'}
+                  {editingUser ? 'Guardar Permisos' : (userModalTexts.saveButtonText || 'Crear Cliente')}
                 </button>
               </div>
             </form>
@@ -2659,10 +2680,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h3 className={`text-xl font-bold font-serif-display ${
                   isDark ? 'text-stone-100' : 'text-slate-900'
                 }`}>
-                  Carga de Fotografías de Alta Resolución
+                  {uploadModalTexts.title || 'Carga de Fotografías de Alta Resolución'}
                 </h3>
                 <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                  Sube archivos con cálculo automático de tamaño y dimensiones.
+                  {uploadModalTexts.subtitle || 'Sube archivos con cálculo automático de tamaño y dimensiones.'}
                 </p>
               </div>
               <button 
@@ -2739,14 +2760,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Título de la Fotografía:</label>
+                <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                  {uploadModalTexts.titleLabel || 'Título de la Fotografía:'}
+                </label>
                 <input
                   id="input-upload-title"
                   type="text"
                   required
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Ej. Retrato al Atardecer"
+                  placeholder={uploadModalTexts.titlePlaceholder || 'Ej. Retrato al Atardecer'}
                   className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                     isDark 
                       ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
@@ -2757,7 +2780,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Tamaño RAW en MB:</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {uploadModalTexts.filesizeLabel || 'Tamaño RAW en MB:'}
+                  </label>
                   <input
                     id="input-upload-filesize"
                     type="number"
@@ -2773,7 +2798,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>Resolución (px):</label>
+                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                    {uploadModalTexts.resolutionLabel || 'Resolución (px):'}
+                  </label>
                   <div className="flex gap-1 text-xs font-mono-code">
                     <input
                       type="number"
@@ -2814,7 +2841,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   id="submit-upload-btn"
                   className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                 >
-                  Subir Fotografía al Servidor
+                  {uploadModalTexts.saveButtonText || 'Subir Fotografía al Servidor'}
                 </button>
               </div>
             </form>
@@ -2834,7 +2861,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <h3 className={`text-base font-bold font-serif-display ${
                 isDark ? 'text-stone-100' : 'text-slate-900'
               }`}>
-                Responder a {replyingFeedback.clientName}
+                {feedbackReplyModalTexts.title || `Responder a ${replyingFeedback.clientName}`}
               </h3>
               <button 
                 onClick={() => setReplyingFeedback(null)}
@@ -2852,7 +2879,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 rows={4}
                 value={feedbackReplyText}
                 onChange={(e) => setFeedbackReplyText(e.target.value)}
-                placeholder="Escribe la respuesta del estudio para el cliente..."
+                placeholder={feedbackReplyModalTexts.replyPlaceholder || 'Escribe la respuesta del estudio para el cliente...'}
                 className={`w-full border rounded-xl p-3 text-xs focus:outline-none focus:ring-2 ${
                   isDark 
                     ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
@@ -2874,7 +2901,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="submit"
                   className={`px-4 py-2 rounded-xl font-bold text-xs cursor-pointer text-white ${colorTheme.twBg} ${colorTheme.twBgHover}`}
                 >
-                  Enviar Respuesta
+                  {feedbackReplyModalTexts.sendButtonText || 'Enviar Respuesta'}
                 </button>
               </div>
             </form>
@@ -2899,10 +2926,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold font-serif-display">
-                    Límite de Almacenamiento
+                    {storageLimitModalTexts.title || 'Límite de Almacenamiento'}
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                    Ajusta la cuota de disco disponible del servidor
+                    {storageLimitModalTexts.subtitle || 'Ajusta la cuota de disco disponible del servidor'}
                   </p>
                 </div>
               </div>
@@ -2920,7 +2947,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Presets Grid */}
             <div className="space-y-2">
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                Seleccionar Cuota Rápida:
+                {storageLimitModalTexts.presetLabel || 'Seleccionar Cuota Rápida:'}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -2966,7 +2993,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Custom Value Input */}
             <div className="space-y-2">
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                O Especificar Cantidad Personalizada:
+                {storageLimitModalTexts.customLabel || 'O Especificar Cantidad Personalizada:'}
               </label>
               <div className="flex gap-2">
                 <input
@@ -3044,7 +3071,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 }}
                 className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${colorTheme.twBg}`}
               >
-                Guardar Límite
+                {storageLimitModalTexts.saveButtonText || 'Guardar Límite'}
               </button>
             </div>
           </div>

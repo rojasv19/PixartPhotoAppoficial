@@ -27,6 +27,23 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 }) => {
   const isDark = theme === 'dark';
   const colorTheme = branding ? COLOR_PRESET_MAP[branding.colorPreset] || COLOR_PRESET_MAP.blue : COLOR_PRESET_MAP.blue;
+  const modalTexts = branding?.modalTexts?.userProfileModal || {
+    title: 'Mi Perfil & Cuenta',
+    subtitle: 'Actualiza tu fotografía de perfil, nombre visible, datos de contacto y contraseña.',
+    nameLabel: 'Nombre Completo *',
+    namePlaceholder: 'Ej: Sofia Valenzuela',
+    emailLabel: 'Correo Electrónico *',
+    emailPlaceholder: 'usuario@estudio.com',
+    phoneLabel: 'Teléfono / WhatsApp',
+    phonePlaceholder: '+34 600 000 000',
+    companyLabel: 'Empresa / Razón Social',
+    companyPlaceholder: 'Lumina Pro / Particular',
+    passwordLabel: 'Contraseña de Acceso',
+    passwordPlaceholder: 'Introduce una contraseña segura',
+    notesLabel: 'Notas / Biografía del Usuario',
+    notesPlaceholder: 'Detalles sobre el cliente, estilo fotográfico o preferencias...',
+    saveButtonText: 'Guardar Cambios',
+  };
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -123,14 +140,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className={`text-xl font-bold font-serif-display ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Mi Perfil & Cuenta
+                {modalTexts.title || 'Mi Perfil & Cuenta'}
               </h3>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}>
                 {currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'photographer' ? 'Fotógrafo' : 'Cliente'}
               </span>
             </div>
             <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Actualiza tu fotografía de perfil, nombre visible, datos de contacto y contraseña.
+              {modalTexts.subtitle || 'Actualiza tu fotografía de perfil, nombre visible, datos de contacto y contraseña.'}
             </p>
           </div>
         </div>
@@ -366,7 +383,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Full Name */}
             <div>
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Nombre Completo *
+                {modalTexts.nameLabel || 'Nombre Completo *'}
               </label>
               <div className="relative">
                 <input
@@ -375,7 +392,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej: Sofia Valenzuela"
+                  placeholder={modalTexts.namePlaceholder || 'Ej: Sofia Valenzuela'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -389,7 +406,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Email */}
             <div>
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Correo Electrónico *
+                {modalTexts.emailLabel || 'Correo Electrónico *'}
               </label>
               <div className="relative">
                 <input
@@ -398,7 +415,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@estudio.com"
+                  placeholder={modalTexts.emailPlaceholder || 'usuario@estudio.com'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -412,7 +429,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Phone */}
             <div>
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Teléfono / WhatsApp
+                {modalTexts.phoneLabel || 'Teléfono / WhatsApp'}
               </label>
               <div className="relative">
                 <input
@@ -420,7 +437,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+34 600 000 000"
+                  placeholder={modalTexts.phonePlaceholder || '+34 600 000 000'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -434,7 +451,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Company / Brand */}
             <div>
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Empresa / Razón Social
+                {modalTexts.companyLabel || 'Empresa / Razón Social'}
               </label>
               <div className="relative">
                 <input
@@ -442,7 +459,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  placeholder="Lumina Pro / Particular"
+                  placeholder={modalTexts.companyPlaceholder || 'Lumina Pro / Particular'}
                   className={`w-full border rounded-xl pl-9 pr-3.5 py-2.5 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -456,7 +473,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Password */}
             <div className="sm:col-span-2">
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Contraseña de Acceso
+                {modalTexts.passwordLabel || 'Contraseña de Acceso'}
               </label>
               <div className="relative">
                 <input
@@ -464,7 +481,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Introduce una contraseña segura"
+                  placeholder={modalTexts.passwordPlaceholder || 'Introduce una contraseña segura'}
                   className={`w-full border rounded-xl pl-9 pr-10 py-2.5 text-xs font-mono-code focus:ring-1 ${colorTheme.twRing} focus:outline-none ${
                     isDark 
                       ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -485,14 +502,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Bio / Notes */}
             <div className="sm:col-span-2">
               <label className={`text-xs font-semibold block mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Notas / Biografía del Usuario
+                {modalTexts.notesLabel || 'Notas / Biografía del Usuario'}
               </label>
               <textarea
                 id="profile-notes-input"
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Detalles sobre el cliente, estilo fotográfico o preferencias..."
+                placeholder={modalTexts.notesPlaceholder || 'Detalles sobre el cliente, estilo fotográfico o preferencias...'}
                 className={`w-full border rounded-xl p-3 text-xs focus:ring-1 ${colorTheme.twRing} focus:outline-none resize-none ${
                   isDark 
                     ? 'bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-600' 
@@ -524,7 +541,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-xs transition-all shadow-md cursor-pointer ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
             >
               <Save className="w-4 h-4" />
-              <span>Guardar Cambios</span>
+              <span>{modalTexts.saveButtonText || 'Guardar Cambios'}</span>
             </button>
           </div>
 

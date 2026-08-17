@@ -170,7 +170,17 @@ export async function downloadImagesAsZip(
 export function loadUsersFromStorage(): User[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.USERS);
-    if (data) return JSON.parse(data);
+    if (data) {
+      const parsed: User[] = JSON.parse(data);
+      // Migrate any legacy demo23 password to the user's defined password
+      return parsed.map(u => {
+        if (u.password === 'demo23') {
+          const init = INITIAL_USERS.find(iu => iu.id === u.id || iu.email.toLowerCase() === u.email.toLowerCase());
+          if (init) return { ...u, password: init.password };
+        }
+        return u;
+      });
+    }
   } catch (e) {
     console.error(e);
   }
