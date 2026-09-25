@@ -4,7 +4,7 @@ import {
   ArrowLeft, Heart, Download, MessageSquare, Share2, MapPin, 
   Calendar, Camera, Check, Filter, Grid, LayoutGrid, Sparkles, 
   Star, Send, HardDrive, ShieldAlert, CheckCircle2, ChevronDown, 
-  Info, Eye, Layers, Lock, Upload, X, ImageIcon, Maximize2
+  Info, Eye, Layers, Lock, Upload, X, ImageIcon, Maximize2, Trash2, AlertTriangle
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, FeedbackItem, StudioBrandingConfig } from '../types';
 import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../services/storageService';
@@ -22,6 +22,8 @@ interface GalleryViewProps {
   onAddFeedback: (galleryId: string, feedback: Omit<FeedbackItem, 'id' | 'createdAt'>) => void;
   onUpdateGallery?: (updatedGallery: GallerySession) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
+  onDeleteImage?: (imageId: string) => void;
+  onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onRequestLogin: () => void;
   theme?: 'light' | 'dark';
   branding?: StudioBrandingConfig;
@@ -36,6 +38,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onAddFeedback,
   onUpdateGallery,
   onUpdateImage,
+  onDeleteImage,
+  onDeleteAllImagesInGallery,
   onRequestLogin,
   theme = 'dark',
   branding,
@@ -73,6 +77,32 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [batchCurrentFile, setBatchCurrentFile] = useState('');
   const [batchIsDone, setBatchIsDone] = useState(false);
   const [favoritesSentSuccess, setFavoritesSentSuccess] = useState(false);
+
+  // Photo Deletion States
+  const [photoToDelete, setPhotoToDelete] = useState<GalleryImage | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
+  const [isDeletingBatch, setIsDeletingBatch] = useState<boolean>(false);
+
+  const handleConfirmDeleteSingle = () => {
+    if (!photoToDelete || !onDeleteImage) return;
+    onDeleteImage(photoToDelete.id);
+    if (selectedImage?.id === photoToDelete.id) {
+      setSelectedImage(null);
+    }
+    setPhotoToDelete(null);
+  };
+
+  const handleConfirmDeleteAll = () => {
+    if (!onDeleteAllImagesInGallery) return;
+    setIsDeletingBatch(true);
+    try {
+      onDeleteAllImagesInGallery(gallery.id);
+      setSelectedImage(null);
+      setShowDeleteAllModal(false);
+    } finally {
+      setIsDeletingBatch(false);
+    }
+  };
 
   // Gallery specific images
   const galleryImages = useMemo(() => {
@@ -261,6 +291,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <Download className={`w-3.5 h-3.5 ${colorTheme.twText}`} />
                 <span className="hidden md:inline">Descargar Álbum ZIP ({galleryImages.length})</span>
                 <span className="md:hidden">ZIP ({galleryImages.length})</span>
+              </button>
+            )}
+
+            {/* Batch Delete All Photos Button (Admin Only) */}
+            {currentUser?.role === 'admin' && onDeleteAllImagesInGallery && galleryImages.length > 0 && (
+              <button
+                id="gallery-delete-all-btn"
+                onClick={() => setShowDeleteAllModal(true)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs cursor-pointer ${
+                  isDark 
+                    ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30 hover:border-rose-500/50' 
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200 hover:border-rose-300'
+                }`}
+                title="Eliminar todas las fotos de esta sesión"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden md:inline">Eliminar todas las fotos ({galleryImages.length})</span>
+                <span className="md:hidden">Eliminar fotos ({galleryImages.length})</span>
               </button>
             )}
 
@@ -672,6 +720,26 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         <Download className="w-4 h-4" />
                       </button>
                     )}
+
+                    {/* Admin Delete Single Photo */}
+                    {currentUser?.role === 'admin' && onDeleteImage && (
+                      <button
+                        id={`delete-photo-${image.id}-btn`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhotoToDelete(image);
+                        }}
+                        className={`p-2 rounded-xl border transition-colors flex-shrink-0 cursor-pointer ${
+                          isDark 
+                            ? 'bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border-rose-500/25 hover:border-rose-500/50' 
+                            : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200'
+                        }`}
+                        title="Eliminar esta fotografía de la galería"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -969,6 +1037,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           canFavorite={canFavorite}
           gallery={gallery}
           onUpdateImage={onUpdateImage}
+          onDeleteImage={onDeleteImage}
           branding={branding}
           onClose={() => setSelectedImage(null)}
           onSelectImage={(img) => setSelectedImage(img)}
@@ -987,6 +1056,130 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
         onClose={() => setIsBatchModalOpen(false)}
         theme={theme}
       />
+
+      {/* Confirmation Modal: Delete Single Photo */}
+      {photoToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 ${
+            isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-500">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold">¿Eliminar esta fotografía?</h3>
+                <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  Se eliminará permanentemente de la sesión <strong>{gallery.title}</strong> y se liberará espacio en el servidor.
+                </p>
+              </div>
+            </div>
+
+            {/* Photo Preview card */}
+            <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+              isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-slate-700/50 bg-black">
+                <img 
+                  src={photoToDelete.url} 
+                  alt={photoToDelete.title} 
+                  className="w-full h-full object-cover" 
+                />
+              </div>
+              <div className="min-w-0 flex-1 text-xs">
+                <p className="font-semibold truncate">{photoToDelete.title}</p>
+                <p className={`text-[11px] font-mono-code truncate ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  {photoToDelete.originalFileName}
+                </p>
+                <p className={`text-[10px] font-mono-code mt-0.5 ${isDark ? 'text-amber-300' : 'text-blue-600'}`}>
+                  {formatBytes(photoToDelete.fileSizeBytes)} • {photoToDelete.width} × {photoToDelete.height} px
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-stone-800/60">
+              <button
+                type="button"
+                onClick={() => setPhotoToDelete(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-300 hover:bg-stone-800' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSingle}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20 cursor-pointer transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sí, Eliminar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Delete ALL Photos in Gallery */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className={`w-full max-w-lg rounded-3xl border p-6 sm:p-7 shadow-2xl space-y-6 ${
+            isDark ? 'bg-stone-900 border-rose-500/30 text-stone-100' : 'bg-white border-rose-200 text-slate-800'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0 text-rose-500 shadow-md shadow-rose-500/10">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-rose-500">¿Eliminar todas las fotografías?</h3>
+                <p className={`text-xs mt-1.5 leading-relaxed ${isDark ? 'text-stone-300' : 'text-slate-600'}`}>
+                  Estás a punto de borrar permanentemente todas las fotografías de la sesión <strong>{gallery.title}</strong>. Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+
+            {/* Summary details */}
+            <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
+              isDark ? 'bg-stone-950 border-stone-800' : 'bg-rose-50/50 border-rose-100'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Sesión:</span>
+                <span className="font-semibold">{gallery.title}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Total de fotos a borrar:</span>
+                <span className="font-bold font-mono-code text-rose-500">{galleryImages.length} fotografías</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Espacio a liberar:</span>
+                <span className="font-bold font-mono-code">{formatBytes(totalGalleryBytes)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-800/60">
+              <button
+                type="button"
+                disabled={isDeletingBatch}
+                onClick={() => setShowDeleteAllModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-300 hover:bg-stone-800' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingBatch}
+                onClick={handleConfirmDeleteAll}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white shadow-lg shadow-rose-600/30 cursor-pointer transition-all flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingBatch ? 'Eliminando fotos...' : `Confirmar y Eliminar Todas (${galleryImages.length})`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

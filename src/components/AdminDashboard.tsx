@@ -32,6 +32,7 @@ interface AdminDashboardProps {
   onDeleteUser: (userId: string) => void;
   onUploadImage: (galleryId: string, imageFile: { title: string; url: string; highResUrl: string; originalFileName: string; fileSizeBytes: number; width: number; height: number; tags: string[] }) => void;
   onDeleteImage: (imageId: string) => void;
+  onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
   onBatchOptimizeImages: () => void;
   onReplyFeedback: (galleryId: string, feedbackId: string, replyText: string) => void;
@@ -58,6 +59,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteUser,
   onUploadImage,
   onDeleteImage,
+  onDeleteAllImagesInGallery,
   onBatchOptimizeImages,
   onReplyFeedback,
   onUpdateImage,
@@ -228,6 +230,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
+
+  // Photo Deletion & Filter States
+  const [galleryToEmptyPhotos, setGalleryToEmptyPhotos] = useState<GallerySession | null>(null);
+  const [photoFilterGalleryId, setPhotoFilterGalleryId] = useState<string>('all');
+  const [adminPhotoToDelete, setAdminPhotoToDelete] = useState<GalleryImage | null>(null);
+
+  const filteredInspectorImages = useMemo(() => {
+    if (photoFilterGalleryId === 'all') return images;
+    return images.filter(i => i.galleryId === photoFilterGalleryId);
+  }, [images, photoFilterGalleryId]);
 
   // Storage Stats Summary
   const usedPercentage = Math.min(100, (storageStats.usedBytes / storageStats.totalCapacityBytes) * 100);
@@ -1404,6 +1416,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
 
+                              {/* Empty Photos in this Session */}
+                              {galImages.length > 0 && onDeleteAllImagesInGallery && (
+                                <button
+                                  id={`empty-photos-gal-btn-${gal.id}`}
+                                  onClick={() => setGalleryToEmptyPhotos(gal)}
+                                  title={`Vaciar todas las fotos (${galImages.length}) de esta sesión`}
+                                  className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                    isDark 
+                                      ? 'bg-stone-800 hover:bg-amber-950/80 text-stone-400 hover:text-amber-400' 
+                                      : 'bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-600'
+                                  }`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
                               {/* Delete Gallery */}
                               <button
                                 id={`delete-gal-btn-${gal.id}`}
@@ -1412,14 +1440,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     onDeleteGallery(gal.id);
                                   }
                                 }}
-                                title="Eliminar Galería"
+                                title="Eliminar Galería Completa"
                                 className={`p-2 rounded-lg transition-colors cursor-pointer ${
                                   isDark 
                                     ? 'bg-stone-800 hover:bg-rose-950/80 text-stone-400 hover:text-rose-400' 
                                     : 'bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600'
                                 }`}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </td>
@@ -1761,10 +1789,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                    Total: <strong className={isDark ? 'text-stone-200' : 'text-slate-800'}>{images.length} fotos</strong>
-                  </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>Sesión:</span>
+                    <select
+                      value={photoFilterGalleryId}
+                      onChange={(e) => setPhotoFilterGalleryId(e.target.value)}
+                      className={`text-xs rounded-xl px-3 py-1.5 border font-sans cursor-pointer ${
+                        isDark ? 'bg-stone-950 border-stone-700 text-stone-200' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    >
+                      <option value="all">Todas las sesiones ({images.length} fotos)</option>
+                      {galleries.map(g => {
+                        const count = images.filter(i => i.galleryId === g.id).length;
+                        return (
+                          <option key={g.id} value={g.id}>
+                            {g.title} ({count} fotos)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Batch delete photos button */}
+                  {filteredInspectorImages.length > 0 && onDeleteAllImagesInGallery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (photoFilterGalleryId !== 'all') {
+                          const targetGal = galleries.find(g => g.id === photoFilterGalleryId);
+                          if (targetGal) setGalleryToEmptyPhotos(targetGal);
+                        } else {
+                          if (confirm(`¿Eliminar permanentemente TODAS las fotografías del servidor (${images.length} fotos)?`)) {
+                            galleries.forEach(g => onDeleteAllImagesInGallery(g.id));
+                          }
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold cursor-pointer transition-colors"
+                      title="Eliminar fotos seleccionadas"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>
+                        {photoFilterGalleryId !== 'all' 
+                          ? `Vaciar fotos de esta sesión (${filteredInspectorImages.length})` 
+                          : `Eliminar todas las fotos (${images.length})`}
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1787,13 +1858,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <tbody className={`divide-y font-mono-code text-[11px] ${
                     isDark ? 'divide-stone-800/60' : 'divide-slate-200'
                   }`}>
-                    {images.map((img) => {
-                      const parentGal = galleries.find(g => g.id === img.galleryId);
+                    {filteredInspectorImages.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className={`text-center py-8 font-sans ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                          No hay fotografías cargadas en esta sesión.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInspectorImages.map((img) => {
+                        const parentGal = galleries.find(g => g.id === img.galleryId);
 
-                      return (
-                        <tr key={img.id} className={`transition-colors ${
-                          isDark ? 'hover:bg-stone-800/40' : 'hover:bg-slate-50'
-                        }`}>
+                        return (
+                          <tr key={img.id} className={`transition-colors ${
+                            isDark ? 'hover:bg-stone-800/40' : 'hover:bg-slate-50'
+                          }`}>
                           
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -1904,11 +1982,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               )}
                               <button
                                 id={`delete-image-btn-${img.id}`}
-                                onClick={() => {
-                                  if (confirm(`¿Eliminar la foto "${img.title}" del servidor?`)) {
-                                    onDeleteImage(img.id);
-                                  }
-                                }}
+                                onClick={() => setAdminPhotoToDelete(img)}
                                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                   isDark 
                                     ? 'text-stone-400 hover:text-rose-400 hover:bg-stone-800' 
@@ -1923,7 +1997,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -3572,6 +3646,141 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${colorTheme.twBg}`}
               >
                 {storageLimitModalTexts.saveButtonText || 'Guardar Límite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Empty All Photos in a Gallery */}
+      {galleryToEmptyPhotos && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className={`w-full max-w-lg rounded-3xl border p-6 sm:p-7 shadow-2xl space-y-6 ${
+            isDark ? 'bg-stone-900 border-rose-500/30 text-stone-100' : 'bg-white border-rose-200 text-slate-800'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0 text-rose-500 shadow-md shadow-rose-500/10">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-rose-500">¿Vaciar fotografías de la sesión?</h3>
+                <p className={`text-xs mt-1.5 leading-relaxed ${isDark ? 'text-stone-300' : 'text-slate-600'}`}>
+                  Se eliminarán permanentemente todas las fotografías cargadas en <strong>{galleryToEmptyPhotos.title}</strong> y se liberará su espacio de almacenamiento.
+                </p>
+              </div>
+            </div>
+
+            {/* Details */}
+            {(() => {
+              const galImgs = images.filter(i => i.galleryId === galleryToEmptyPhotos.id);
+              const totalBytes = galImgs.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
+              return (
+                <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
+                  isDark ? 'bg-stone-950 border-stone-800' : 'bg-rose-50/50 border-rose-100'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Sesión:</span>
+                    <span className="font-semibold">{galleryToEmptyPhotos.title}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Fotos a eliminar:</span>
+                    <span className="font-bold font-mono-code text-rose-500">{galImgs.length} fotografías</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Espacio a liberar:</span>
+                    <span className="font-bold font-mono-code">{formatBytes(totalBytes)}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-800/60">
+              <button
+                type="button"
+                onClick={() => setGalleryToEmptyPhotos(null)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-300 hover:bg-stone-800' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteAllImagesInGallery) {
+                    onDeleteAllImagesInGallery(galleryToEmptyPhotos.id);
+                  }
+                  setGalleryToEmptyPhotos(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 cursor-pointer transition-all flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Confirmar y Vaciar Fotos</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Delete Single Photo from Inspector */}
+      {adminPhotoToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 ${
+            isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-500">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold">¿Eliminar esta fotografía?</h3>
+                <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  Se eliminará permanentemente del servidor y se liberará espacio en disco.
+                </p>
+              </div>
+            </div>
+
+            <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+              isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-slate-700/50 bg-black">
+                <img 
+                  src={adminPhotoToDelete.url} 
+                  alt={adminPhotoToDelete.title} 
+                  className="w-full h-full object-cover" 
+                />
+              </div>
+              <div className="min-w-0 flex-1 text-xs">
+                <p className="font-semibold truncate">{adminPhotoToDelete.title}</p>
+                <p className={`text-[11px] font-mono-code truncate ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  {adminPhotoToDelete.originalFileName}
+                </p>
+                <p className={`text-[10px] font-mono-code mt-0.5 ${isDark ? 'text-amber-300' : 'text-blue-600'}`}>
+                  {formatBytes(adminPhotoToDelete.fileSizeBytes)} • {adminPhotoToDelete.width} × {adminPhotoToDelete.height} px
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-stone-800/60">
+              <button
+                type="button"
+                onClick={() => setAdminPhotoToDelete(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-300 hover:bg-stone-800' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteImage(adminPhotoToDelete.id);
+                  setAdminPhotoToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20 cursor-pointer transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sí, Eliminar</span>
               </button>
             </div>
           </div>

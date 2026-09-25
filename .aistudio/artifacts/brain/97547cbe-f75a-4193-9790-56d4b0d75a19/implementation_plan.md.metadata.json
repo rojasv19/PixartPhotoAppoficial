@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para corregir el error de pantalla en blanco al subir imágenes en lote: optimización de previews en canvas sin saturar localStorage/WebSockets, protección contra QuotaExceededError en storageService, y creación de un ErrorBoundary protector con recuperación automática.",
-  "updatedAt":  "2026-09-25T19:55:38.953765586Z",
+  "summary":  "Plan para agregar la opción de eliminar fotos de una en una dentro de la galería y la opción de eliminar todas las imágenes de una galería en lote con modal de confirmación.",
+  "updatedAt":  "2026-09-25T20:12:35.187911196Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

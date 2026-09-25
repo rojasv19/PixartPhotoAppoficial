@@ -432,6 +432,12 @@ export async function deleteImageFromDb(imageId: string) {
   return db.transact([tx.images[toUuid(imageId)].delete()]);
 }
 
+export async function deleteImagesBatchFromDb(imageIds: string[]) {
+  if (!imageIds || imageIds.length === 0) return;
+  const mutations = imageIds.map(id => tx.images[toUuid(id)].delete());
+  return db.transact(mutations);
+}
+
 export async function toggleImageFavoriteInDb(
   imageId: string, 
   userId: string, 

@@ -40,6 +40,7 @@ import {
   deleteUserInDb,
   uploadImageToDb,
   deleteImageFromDb,
+  deleteImagesBatchFromDb,
   toggleImageFavoriteInDb,
   updateImageInDb,
   addFeedbackToDb,
@@ -720,6 +721,18 @@ export default function App() {
     addAuditLog('Foto Eliminada', `Eliminó la imagen "${targetImg?.title}" y liberó espacio en el servidor.`);
   };
 
+  const handleDeleteAllImagesInGallery = (galleryId: string) => {
+    const parentGal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
+    const targetGalId = parentGal?.id || galleryId;
+    const targetImages = images.filter(img => img.galleryId === targetGalId || toUuid(img.galleryId) === toUuid(targetGalId));
+    if (!targetImages.length) return;
+
+    const imageIds = targetImages.map(img => img.id);
+    setLocalImages(prev => prev.filter(img => img.galleryId !== targetGalId && toUuid(img.galleryId) !== toUuid(targetGalId)));
+    deleteImagesBatchFromDb(imageIds).catch(err => console.error('InstantDB batch delete error:', err));
+    addAuditLog('Fotos Eliminadas Masivamente', `Eliminó todas las fotografías (${targetImages.length} fotos) de la sesión "${parentGal?.title || 'Galería'}".`);
+  };
+
   // Batch Image Optimizer (WebP smart compression simulation)
   const handleBatchOptimizeImages = () => {
     const updatedImages = images.map(img => ({
@@ -820,6 +833,8 @@ export default function App() {
             onAddFeedback={handleAddFeedback}
             onUpdateGallery={handleUpdateGallery}
             onUpdateImage={handleUpdateImage}
+            onDeleteImage={handleDeleteImage}
+            onDeleteAllImagesInGallery={handleDeleteAllImagesInGallery}
             onRequestLogin={() => {
               setAuthModalInitialTab('client');
               setIsAuthModalOpen(true);
@@ -858,6 +873,7 @@ export default function App() {
             onDeleteUser={handleDeleteUser}
             onUploadImage={handleUploadImage}
             onDeleteImage={handleDeleteImage}
+            onDeleteAllImagesInGallery={handleDeleteAllImagesInGallery}
             onBatchOptimizeImages={handleBatchOptimizeImages}
             onReplyFeedback={handleReplyFeedback}
             onUpdateImage={handleUpdateImage}

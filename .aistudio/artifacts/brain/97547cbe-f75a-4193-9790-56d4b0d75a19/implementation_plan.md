@@ -1,47 +1,53 @@
-# Plan de Corrección: Prevención de Pantalla en Blanco al Subir Imágenes en Lote
+# Plan de Implementación: Eliminación Individual y Masiva de Fotografías en Galerías
 
-## 1. Causa Raíz Identificada
-Al subir 3 o más imágenes de alta resolución (cada una de 5MB a 25MB):
-1. **Límite de Cuota de `localStorage` Superado (`DOMException: QuotaExceededError`):**
-   - El navegador impone un límite estricto de **~5 MB** para todo el `localStorage`.
-   - Las imágenes se estaban leyendo como cadenas Base64 completas sin comprimir (cada una ocupaba de 15MB a 35MB de texto). Al intentar guardar 3 fotos en `localStorage.setItem(STORAGE_KEYS.IMAGES, ...)`, el navegador lanzó de forma inmediata un error fatal de cuota excedida.
-   - Como `saveImagesToStorage` carecía de bloque `try...catch`, el error no fue capturado y provocó que React desmontara toda la aplicación, dejando la **pantalla totalmente en blanco**.
-2. **Saturación del WebSocket de Base de Datos (`InstantDB`):**
-   - Al enviar transacciones con imágenes Base64 de decenas de megabytes por el canal de WebSocket, se supera el tamaño máximo de paquete permitido por los navegadores (1MB–4MB por mensaje), provocando desconexiones y fallos en cadena.
-3. **Ausencia de `ErrorBoundary` Global:**
-   - La aplicación no contaba con un componente protector de errores (`ErrorBoundary`) que atrapara excepciones no controladas y ofreciera una recuperación elegante.
+## 1. Resumen de Requerimientos
+- **Eliminación Individual (de una en una):**
+  - Permitir a los administradores eliminar fotografías una a una directamente desde la vista de la galería (`GalleryView.tsx`), en cada tarjeta de foto de la cuadrícula y desde el visor a pantalla completa (Lightbox).
+  - Mantener y mejorar la eliminación individual en la tabla del Inspector de Archivos en el panel de administración (`AdminDashboard.tsx`).
+- **Eliminación Masiva (todas las imágenes):**
+  - Agregar un botón prominente *"Eliminar todas las fotos"* en la barra de herramientas de la galería (`GalleryView.tsx`) cuando el usuario tiene permisos de administrador.
+  - Agregar la opción de *"Vaciar fotos de la sesión"* tanto en la lista de Sesiones como en el Inspector de Fotos de `AdminDashboard.tsx`.
+  - Desplegar una **ventana modal de confirmación** de seguridad antes de proceder con el borrado masivo, mostrando la cantidad exacta de fotos que se eliminarán y solicitando confirmación explícita para evitar pérdidas accidentales.
 
 ---
 
-## 2. Solución Propuesta
+## 2. Modificaciones Propuestas
 
-### A. Optimización Automática de Previews para Navegador (`AdminDashboard.tsx`)
-- Al seleccionar o soltar archivos reales en el modal de subida:
-  - Leer las dimensiones nativas originales (`naturalWidth` × `naturalHeight`) y el peso real del archivo en bytes (`file.size`) para mostrarlos con total fidelidad en la ficha de metadatos.
-  - Generar un renderizado web optimizado mediante un elemento `<canvas>` (redimensionado proporcionalmente a un máximo de 1600px con compresión JPEG al 82%).
-  - Esto reduce el tamaño en memoria y almacenamiento de **30 MB por imagen a solo ~180 KB**, permitiendo subir decenas de fotos sin saturar la memoria, la cuota de `localStorage` ni el canal de datos de InstantDB.
+### A. Capa de Servicios y Estado Global (`src/services/instantDbService.ts` & `src/App.tsx`)
+1. **Servicio InstantDB:**
+   - Crear la función `deleteImagesBatchFromDb(imageIds: string[])` para eliminar múltiples registros de fotos atómicamente de la base de datos.
+2. **Controlador en `src/App.tsx`:**
+   - Crear `handleDeleteAllImagesInGallery(galleryId: string)`:
+     - Filtra y remueve todas las fotos de la galería en el estado local (`setLocalImages`).
+     - Sincroniza la eliminación en lote con InstantDB.
+     - Registra una entrada en el historial de auditoría (*"Eliminó todas las X fotos de la sesión..."*).
+   - Pasar `onDeleteImage` y `onDeleteAllImagesInGallery` como props a `GalleryView.tsx`.
 
-### B. Blindaje de `saveImagesToStorage` y Limpieza Segura (`src/services/storageService.ts`)
-- Envolver `saveImagesToStorage` en un bloque `try...catch` robusto.
-- Si se detecta un `QuotaExceededError`:
-  - Sanitizar la lista de imágenes para no persistir cadenas base64 gigantes en `localStorage`.
-  - Proteger `loadImagesFromStorage` para que detecte si hay datos corruptos o sobrecargados y los depure automáticamente sin dejar caer la aplicación.
+### B. Vista de Galería (`src/components/GalleryView.tsx`)
+1. **Acción Individual en Cuadrícula & Tarjetas:**
+   - Si `currentUser?.role === 'admin'`, mostrar un botón de eliminación (ícono de papelera) en la esquina o acciones rápidas de cada tarjeta fotográfica.
+   - Al pulsar, muestra un diálogo de confirmación: *"¿Eliminar esta fotografía de la galería?"*.
+2. **Acción Masiva en Barra Superior:**
+   - Botón *"Eliminar todas las fotos ({conteo})"* en la barra de herramientas superior para administradores.
+   - Ventana modal de confirmación con advertencia visual:
+     - Título: *"¿Eliminar todas las fotografías de esta galería?"*.
+     - Mensaje: *"Esta acción eliminará permanentemente las {total} fotos de la sesión '{título}'. Esta acción no se puede deshacer."*.
+     - Botones *"Cancelar"* y *"Sí, Eliminar Todas"*.
 
-### C. Creación del Componente Protector `ErrorBoundary` (`src/components/ErrorBoundary.tsx`)
-- Crear un componente `ErrorBoundary` de React con interfaz limpia:
-  - Atrapa cualquier error inesperado en el ciclo de vida de los componentes.
-  - En lugar de una pantalla en blanco, muestra un mensaje descriptivo con un botón de *"Recuperar y Recargar Aplicación"*, que restablece la caché local segura y recarga la interfaz al instante.
-- Envolver la aplicación en `src/main.tsx` o `src/App.tsx`.
+### C. Panel de Administración (`src/components/AdminDashboard.tsx`)
+1. **En la tabla de Sesiones / Galerías:**
+   - Agregar una acción rápida en cada fila de sesión para *"Vaciar fotografías"* si la galería cuenta con fotos.
+2. **En la pestaña de Inspector de Archivos / Fotos:**
+   - Agregar selector/filtro de galería y botón *"Eliminar todas las fotos"* con ventana de confirmación.
 
 ---
 
 ## 3. Plan de Verificación
-1. **Prueba de Carga en Lote con Múltiples Imágenes:**
-   - Subir 3 o más fotografías reales (tanto por selector múltiple como arrastrando y soltando).
-   - Confirmar que el modal procesa la cola y la subida se completa al 100% sin parpadeos, congelamientos ni pantalla en blanco.
-2. **Verificación de Metadatos:**
-   - Confirmar que las fotos agregadas en la galería y en la tabla de fotos conservan su peso real en MB, resolución original (ej. 6720x4480) y nombre original de archivo.
-3. **Prueba de Persistencia y Recarga:**
-   - Recargar el navegador después de subir el lote y verificar que la aplicación inicia inmediatamente sin errores de cuota.
-4. **Validación de Compilación y Linter:**
-   - Ejecutar `lint_applet` y `compile_applet` para garantizar que la compilación es limpia y sin errores.
+1. **Eliminación Individual en Galería:**
+   - Entrar a una galería como admin y borrar una foto individualmente; comprobar que desaparece de inmediato de la cuadrícula y se actualiza el contador.
+2. **Eliminación Masiva en Galería:**
+   - Pulsar *"Eliminar todas las fotos"* en la galería, verificar que aparece el modal de confirmación con el conteo exacto de fotos, confirmar y verificar que la galería queda limpia y con su estado vacío amigable.
+3. **Eliminación desde el Panel de Administración:**
+   - Probar la opción de vaciar fotos de una sesión desde la tabla de galerías.
+4. **Verificación de Compilación y Linter:**
+   - Ejecutar `lint_applet` y `compile_applet` para asegurar cero errores de TypeScript y compilación exitosa.

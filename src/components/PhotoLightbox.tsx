@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, Heart, Download, Camera, Sliders, 
-  Maximize2, Minimize2, ZoomIn, ZoomOut, Info, Sparkles, Check, HardDrive
+  Maximize2, Minimize2, ZoomIn, ZoomOut, Info, Sparkles, Check, HardDrive, Trash2
 } from 'lucide-react';
 import { GalleryImage, GallerySession, User, StudioBrandingConfig } from '../types';
 import { formatBytes, downloadSingleImage } from '../services/storageService';
@@ -20,6 +20,7 @@ interface PhotoLightboxProps {
   branding?: StudioBrandingConfig;
   gallery?: GallerySession;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
+  onDeleteImage?: (imageId: string) => void;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -34,6 +35,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   branding,
   gallery,
   onUpdateImage,
+  onDeleteImage,
 }) => {
   const [showExif, setShowExif] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -288,6 +290,32 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               <span className="sm:hidden">
                 {image.excludeWatermark ? 'Sin Marca' : 'Quitar Marca'}
               </span>
+            </button>
+          )}
+
+          {/* Admin Delete Photo Button */}
+          {currentUser?.role === 'admin' && onDeleteImage && (
+            <button
+              id="lightbox-admin-delete-btn"
+              type="button"
+              onClick={() => {
+                if (confirm(`¿Estás seguro de eliminar permanentemente la foto "${image.title}" de la galería?`)) {
+                  onDeleteImage(image.id);
+                  if (images.length <= 1) {
+                    onClose();
+                  } else if (hasNext) {
+                    handleNext();
+                  } else if (hasPrev) {
+                    handlePrev();
+                  } else {
+                    onClose();
+                  }
+                }
+              }}
+              className="p-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 hover:text-rose-100 transition-colors cursor-pointer"
+              title="Eliminar esta foto del servidor"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
 
