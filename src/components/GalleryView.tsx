@@ -967,6 +967,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           currentUser={currentUser}
           canDownload={canDownload}
           canFavorite={canFavorite}
+          gallery={gallery}
+          onUpdateImage={onUpdateImage}
+          branding={branding}
           onClose={() => setSelectedImage(null)}
           onSelectImage={(img) => setSelectedImage(img)}
           onToggleFavorite={onToggleFavorite}

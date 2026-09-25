@@ -318,18 +318,20 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
 
         {/* Center Stage Image */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-auto">
-          <div className="relative max-w-full max-h-full flex items-center justify-center">
+          <div 
+            className="relative inline-block max-w-full max-h-full"
+            style={{
+              transform: `scale(${zoomLevel})`,
+              transition: 'transform 0.2s ease-out',
+            }}
+          >
             <img
               src={image.highResUrl || image.url}
               alt={image.title}
               referrerPolicy="no-referrer"
-              style={{
-                transform: `scale(${zoomLevel})`,
-                transition: 'transform 0.2s ease-out',
-              }}
               className={`${
                 isFullscreen || isImmersive ? 'max-h-[88vh] max-w-[96vw]' : 'max-h-[75vh] max-w-full'
-              } object-contain rounded-lg shadow-2xl border border-slate-800 transition-all`}
+              } object-contain rounded-lg shadow-2xl border border-slate-800 block`}
             />
 
             {/* Watermark Overlay in Lightbox */}
@@ -342,6 +344,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 watermarkImageUrl={gallery.watermarkImageUrl}
                 watermarkPosition={gallery.watermarkPosition}
                 watermarkOpacity={gallery.watermarkOpacity}
+                className="rounded-lg"
               />
             )}
 

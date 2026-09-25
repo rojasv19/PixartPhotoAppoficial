@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para mover los permisos de cliente a nivel de galería, agregar configuración integral de marca de agua (texto/imagen, central/repetida en mosaico) con bloqueo automático de descargas generales, y habilitación de excepciones por foto individual con descarga directa automática para imágenes libres de marca de agua, accesible exclusivamente para perfiles de administrador.",
-  "updatedAt":  "2026-09-25T14:11:13.831891697Z",
+  "summary":  "Plan enfocado exclusivamente en habilitar la marca de agua dentro de la previsualización a pantalla completa (Lightbox) al hacer clic en una foto dentro de la galería.",
+  "updatedAt":  "2026-09-25T16:22:59.469610355Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
