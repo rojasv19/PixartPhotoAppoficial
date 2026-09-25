@@ -28,7 +28,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const isDark = theme === 'dark';
   const colorTheme = branding ? COLOR_PRESET_MAP[branding.colorPreset] || COLOR_PRESET_MAP.blue : COLOR_PRESET_MAP.blue;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const modalTexts = branding?.modalTexts?.userProfileModal || {
+  const modalTexts: any = (branding?.modalTexts?.userProfileModal as any) || {
     title: 'Mi Perfil & Cuenta',
     subtitle: 'Actualiza tu fotografía de perfil, nombre visible, datos de contacto y contraseña.',
     nameLabel: 'Nombre Completo *',

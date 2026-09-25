@@ -1,55 +1,47 @@
-# Plan de Implementación: Carga Múltiple y Detección Automática de Metadatos en Subida de Fotografías
+# Plan de Corrección: Prevención de Pantalla en Blanco al Subir Imágenes en Lote
 
-## 1. Diagnóstico del Estado Actual
-- Actualmente, el modal de *"Subir Nueva Fotografía"* (`AdminDashboard.tsx`) contiene campos manuales editables:
-  - Input de texto para *"Título de la Fotografía"*.
-  - Input numérico para *"Tamaño RAW en MB"*.
-  - Inputs numéricos para *"Resolución (px)"* (ancho × alto).
-- Además, solo admite la selección de **un único archivo a la vez**, y no cuenta con soporte nativo de arrastrar y soltar múltiple ni con una lista de previsualización de cola de subida.
+## 1. Causa Raíz Identificada
+Al subir 3 o más imágenes de alta resolución (cada una de 5MB a 25MB):
+1. **Límite de Cuota de `localStorage` Superado (`DOMException: QuotaExceededError`):**
+   - El navegador impone un límite estricto de **~5 MB** para todo el `localStorage`.
+   - Las imágenes se estaban leyendo como cadenas Base64 completas sin comprimir (cada una ocupaba de 15MB a 35MB de texto). Al intentar guardar 3 fotos en `localStorage.setItem(STORAGE_KEYS.IMAGES, ...)`, el navegador lanzó de forma inmediata un error fatal de cuota excedida.
+   - Como `saveImagesToStorage` carecía de bloque `try...catch`, el error no fue capturado y provocó que React desmontara toda la aplicación, dejando la **pantalla totalmente en blanco**.
+2. **Saturación del WebSocket de Base de Datos (`InstantDB`):**
+   - Al enviar transacciones con imágenes Base64 de decenas de megabytes por el canal de WebSocket, se supera el tamaño máximo de paquete permitido por los navegadores (1MB–4MB por mensaje), provocando desconexiones y fallos en cadena.
+3. **Ausencia de `ErrorBoundary` Global:**
+   - La aplicación no contaba con un componente protector de errores (`ErrorBoundary`) que atrapara excepciones no controladas y ofreciera una recuperación elegante.
 
 ---
 
-## 2. Modificaciones Propuestas
+## 2. Solución Propuesta
 
-### A. Eliminación de Campos Manuales & Lectura Real de Metadatos
-- **Eliminar inputs manuales:**
-  - Se retirarán los campos de entrada de texto/número correspondientes al título, tamaño en MB y resolución en píxeles.
-- **Detección Automática y Exacta:**
-  - **Título / Nombre Original:** Extraído directamente del nombre del archivo en el sistema operativo (ej. `IMG_4920_RAW.CR3` o `Boda_Valenzuela_01.jpg`), limpiando la extensión para el título visual y preservando el nombre completo en `originalFileName`.
-  - **Peso Real:** Calculado con precisión milimétrica a partir de `file.size` en bytes y formateado dinámicamente (ej. `24.6 MB`, `8.4 MB`, `950 KB`).
-  - **Resolución Real:** Obtenida al instanciar el objeto nativo `new Image()` y leer sus dimensiones naturales `naturalWidth` y `naturalHeight` (ej. `6720 × 4480 px`, `4000 × 3000 px`).
+### A. Optimización Automática de Previews para Navegador (`AdminDashboard.tsx`)
+- Al seleccionar o soltar archivos reales en el modal de subida:
+  - Leer las dimensiones nativas originales (`naturalWidth` × `naturalHeight`) y el peso real del archivo en bytes (`file.size`) para mostrarlos con total fidelidad en la ficha de metadatos.
+  - Generar un renderizado web optimizado mediante un elemento `<canvas>` (redimensionado proporcionalmente a un máximo de 1600px con compresión JPEG al 82%).
+  - Esto reduce el tamaño en memoria y almacenamiento de **30 MB por imagen a solo ~180 KB**, permitiendo subir decenas de fotos sin saturar la memoria, la cuota de `localStorage` ni el canal de datos de InstantDB.
 
-### B. Carga Múltiple Simultánea (Selector & Arrastrar y Soltar / Drag & Drop)
-- **Soporte de Entrada Múltiple:**
-  - Agregar el atributo `multiple` al `<input type="file" multiple accept="image/*" />`.
-  - Permitir seleccionar varios archivos de golpe en el explorador del sistema operativo.
-- **Zona de Arrastrar y Soltar (Drag & Drop):**
-  - Configurar manejadores `onDragOver`, `onDragLeave` y `onDrop` sobre la zona de carga del modal con retroalimentación visual interactiva al arrastrar archivos.
-  - Capacidad de soltar múltiples archivos directamente en el modal para agregarlos a la cola.
-- **Cola de Subida con Fichas de Metadatos Reales:**
-  - Mostrar una lista o cuadrícula de previsualización con cada una de las fotografías agregadas:
-    - Miniatura de la imagen real.
-    - Nombre del archivo y título detectado.
-    - Peso real en MB/KB.
-    - Resolución real detectada en px (`Ancho × Alto`).
-    - Botón individual para descartar/quitar cualquier fotografía antes de confirmar.
-  - Resumen global en la parte inferior: e.g. *"5 fotografías listas para subir • 118.4 MB en total"*.
+### B. Blindaje de `saveImagesToStorage` y Limpieza Segura (`src/services/storageService.ts`)
+- Envolver `saveImagesToStorage` en un bloque `try...catch` robusto.
+- Si se detecta un `QuotaExceededError`:
+  - Sanitizar la lista de imágenes para no persistir cadenas base64 gigantes en `localStorage`.
+  - Proteger `loadImagesFromStorage` para que detecte si hay datos corruptos o sobrecargados y los depure automáticamente sin dejar caer la aplicación.
 
-### C. Procesamiento de Subida en Lote
-- Botón de confirmación dinámico: *"Subir X Fotografías al Servidor"*.
-- Procesar cada archivo de la cola creando los registros correspondientes en la galería mediante `onUploadImage`, registrando las entradas de auditoría y cerrando el modal al completar satisfactoriamente.
+### C. Creación del Componente Protector `ErrorBoundary` (`src/components/ErrorBoundary.tsx`)
+- Crear un componente `ErrorBoundary` de React con interfaz limpia:
+  - Atrapa cualquier error inesperado en el ciclo de vida de los componentes.
+  - En lugar de una pantalla en blanco, muestra un mensaje descriptivo con un botón de *"Recuperar y Recargar Aplicación"*, que restablece la caché local segura y recarga la interfaz al instante.
+- Envolver la aplicación en `src/main.tsx` o `src/App.tsx`.
 
 ---
 
 ## 3. Plan de Verificación
-1. **Verificación de la Interfaz:**
-   - Comprobar que ya no existen campos editables para escribir título, peso ni resolución.
-2. **Prueba de Selección Múltiple y Drag & Drop:**
-   - Seleccionar varios archivos a la vez con el botón *"Seleccionar desde tu dispositivo"*.
-   - Arrastrar y soltar varios archivos dentro del modal y comprobar que se incorporan a la cola.
-3. **Prueba de Metadatos Reales:**
-   - Verificar que cada archivo en la cola muestra su nombre original, su peso en MB exacto y su resolución nativa en píxeles.
-4. **Prueba de Carga en Lote:**
-   - Confirmar la subida y verificar que todas las fotos aparecen en la galería y en la pestaña de fotos con sus metadatos reales.
-5. **Validación de Compilación y Linter:**
+1. **Prueba de Carga en Lote con Múltiples Imágenes:**
+   - Subir 3 o más fotografías reales (tanto por selector múltiple como arrastrando y soltando).
+   - Confirmar que el modal procesa la cola y la subida se completa al 100% sin parpadeos, congelamientos ni pantalla en blanco.
+2. **Verificación de Metadatos:**
+   - Confirmar que las fotos agregadas en la galería y en la tabla de fotos conservan su peso real en MB, resolución original (ej. 6720x4480) y nombre original de archivo.
+3. **Prueba de Persistencia y Recarga:**
+   - Recargar el navegador después de subir el lote y verificar que la aplicación inicia inmediatamente sin errores de cuota.
+4. **Validación de Compilación y Linter:**
    - Ejecutar `lint_applet` y `compile_applet` para garantizar que la compilación es limpia y sin errores.

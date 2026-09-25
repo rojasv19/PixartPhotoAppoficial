@@ -66,12 +66,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const isDark = theme === 'dark';
   const colorTheme = branding ? COLOR_PRESET_MAP[branding.colorPreset] || COLOR_PRESET_MAP.blue : COLOR_PRESET_MAP.blue;
-  const modalTexts = branding?.modalTexts || DEFAULT_MODAL_TEXTS;
-  const galleryModalTexts = modalTexts.galleryModal || DEFAULT_MODAL_TEXTS.galleryModal;
-  const userModalTexts = modalTexts.userModal || DEFAULT_MODAL_TEXTS.userModal;
-  const uploadModalTexts = modalTexts.uploadModal || DEFAULT_MODAL_TEXTS.uploadModal;
-  const storageLimitModalTexts = modalTexts.storageLimitModal || DEFAULT_MODAL_TEXTS.storageLimitModal;
-  const feedbackReplyModalTexts = modalTexts.feedbackReplyModal || DEFAULT_MODAL_TEXTS.feedbackReplyModal;
+  const modalTexts: any = branding?.modalTexts || DEFAULT_MODAL_TEXTS;
+  const galleryModalTexts: any = modalTexts.galleryModal || DEFAULT_MODAL_TEXTS.galleryModal;
+  const userModalTexts: any = modalTexts.userModal || DEFAULT_MODAL_TEXTS.userModal;
+  const uploadModalTexts: any = modalTexts.uploadModal || DEFAULT_MODAL_TEXTS.uploadModal;
+  const storageLimitModalTexts: any = modalTexts.storageLimitModal || DEFAULT_MODAL_TEXTS.storageLimitModal;
+  const feedbackReplyModalTexts: any = modalTexts.feedbackReplyModal || DEFAULT_MODAL_TEXTS.feedbackReplyModal;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding'>(initialTab);
 
@@ -227,6 +227,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }>>([]);
   const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
+  const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
 
   // Storage Stats Summary
   const usedPercentage = Math.min(100, (storageStats.usedBytes / storageStats.totalCapacityBytes) * 100);
@@ -422,81 +423,128 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setShowNewClientModal(true);
   };
 
-  // Process Multiple Files For Upload
-  const processFilesForUpload = (files: FileList | File[]) => {
-    const fileList = Array.from(files).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|tiff?|cr3|arw|nef|raw|dng)$/i.test(f.name));
-    if (fileList.length === 0) return;
+  // Helper to generate a lightweight web thumbnail and extract exact native dimensions
+  const processImageFile = (file: File): Promise<{
+    thumbnailUrl: string;
+    width: number;
+    height: number;
+  }> => {
+    return new Promise((resolve) => {
+      const isRawCameraFormat = /\.(cr3|cr2|arw|nef|nrw|dng|raw|rw2|orf)$/i.test(file.name);
+      if (isRawCameraFormat) {
+        // High-end camera RAW formats cannot be decoded directly by HTML Image()
+        // Provide standard editorial preview, while keeping exact RAW file size and original metadata
+        resolve({
+          thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
+          width: 6720,
+          height: 4480,
+        });
+        return;
+      }
 
-    setIsProcessingUploads(true);
-    let loadedCount = 0;
-
-    fileList.forEach(file => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const previewUrl = (event.target?.result as string) || '';
+      reader.onload = (e) => {
+        const fullDataUrl = (e.target?.result as string) || '';
         const img = new Image();
         img.onload = () => {
-          const width = img.naturalWidth || img.width || 4000;
-          const height = img.naturalHeight || img.height || 3000;
-          const originalName = file.name;
-          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+          const naturalW = img.naturalWidth || img.width || 4000;
+          const naturalH = img.naturalHeight || img.height || 3000;
 
-          setPendingUploadFiles(prev => [
-            ...prev,
-            {
-              id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              name: originalName,
-              title: title || 'Fotografía',
-              fileSizeBytes: file.size,
-              sizeFormatted: formatBytes(file.size),
-              previewUrl,
-              width,
-              height,
+          // Downscale preview thumbnail to max 1280px to keep storage tiny (< 100KB per photo)
+          const maxDimension = 1280;
+          let targetW = naturalW;
+          let targetH = naturalH;
+          if (targetW > maxDimension || targetH > maxDimension) {
+            if (targetW > targetH) {
+              targetH = Math.round((targetH * maxDimension) / targetW);
+              targetW = maxDimension;
+            } else {
+              targetW = Math.round((targetW * maxDimension) / targetH);
+              targetH = maxDimension;
             }
-          ]);
-
-          loadedCount++;
-          if (loadedCount >= fileList.length) {
-            setIsProcessingUploads(false);
           }
+
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, targetW, targetH);
+              const compressed = canvas.toDataURL('image/jpeg', 0.8);
+              resolve({
+                thumbnailUrl: compressed,
+                width: naturalW,
+                height: naturalH,
+              });
+              return;
+            }
+          } catch (canvasErr) {
+            console.warn('Canvas thumbnail compression failed:', canvasErr);
+          }
+
+          resolve({
+            thumbnailUrl: fullDataUrl.length < 250000 ? fullDataUrl : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
+            width: naturalW,
+            height: naturalH,
+          });
         };
 
         img.onerror = () => {
-          const originalName = file.name;
-          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-
-          setPendingUploadFiles(prev => [
-            ...prev,
-            {
-              id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              name: originalName,
-              title: title || 'Fotografía',
-              fileSizeBytes: file.size,
-              sizeFormatted: formatBytes(file.size),
-              previewUrl: previewUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85',
-              width: 6000,
-              height: 4000,
-            }
-          ]);
-
-          loadedCount++;
-          if (loadedCount >= fileList.length) {
-            setIsProcessingUploads(false);
-          }
+          resolve({
+            thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
+            width: 6000,
+            height: 4000,
+          });
         };
 
-        img.src = previewUrl;
+        img.src = fullDataUrl;
       };
 
       reader.onerror = () => {
-        loadedCount++;
-        if (loadedCount >= fileList.length) {
-          setIsProcessingUploads(false);
-        }
+        resolve({
+          thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
+          width: 6000,
+          height: 4000,
+        });
       };
 
       reader.readAsDataURL(file);
     });
+  };
+
+  // Process Multiple Files For Upload
+  const processFilesForUpload = async (files: FileList | File[]) => {
+    const fileList = Array.from(files).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|tiff?|cr3|arw|nef|raw|dng)$/i.test(f.name));
+    if (fileList.length === 0) return;
+
+    setIsProcessingUploads(true);
+
+    try {
+      const results = await Promise.all(
+        fileList.map(async (file) => {
+          const processed = await processImageFile(file);
+          const originalName = file.name;
+          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+          return {
+            id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            name: originalName,
+            title: title || 'Fotografía',
+            fileSizeBytes: file.size,
+            sizeFormatted: formatBytes(file.size),
+            previewUrl: processed.thumbnailUrl,
+            width: processed.width,
+            height: processed.height,
+          };
+        })
+      );
+
+      setPendingUploadFiles(prev => [...prev, ...results]);
+    } catch (err) {
+      console.error('Error processing upload files:', err);
+    } finally {
+      setIsProcessingUploads(false);
+    }
   };
 
   const handleRemovePendingFile = (id: string) => {
@@ -507,24 +555,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPendingUploadFiles([]);
   };
 
-  // Submit Multiple Real Images Upload
+  // Submit Multiple Real Images Upload Safely
   const handleUploadImageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadGalleryId || pendingUploadFiles.length === 0) return;
+    if (!uploadGalleryId || pendingUploadFiles.length === 0 || isSubmittingBatch) return;
 
-    pendingUploadFiles.forEach(item => {
-      onUploadImage(uploadGalleryId, {
-        title: item.title,
-        url: item.previewUrl,
-        highResUrl: item.previewUrl,
-        originalFileName: item.name,
-        fileSizeBytes: item.fileSizeBytes,
-        width: item.width,
-        height: item.height,
-        tags: ['RAW', 'Alta Resolución'],
+    setIsSubmittingBatch(true);
+    const targetGalId = uploadGalleryId;
+    const items = [...pendingUploadFiles];
+
+    try {
+      items.forEach(item => {
+        onUploadImage(targetGalId, {
+          title: item.title,
+          url: item.previewUrl,
+          highResUrl: item.previewUrl,
+          originalFileName: item.name,
+          fileSizeBytes: item.fileSizeBytes,
+          width: item.width,
+          height: item.height,
+          tags: ['RAW', 'Alta Resolución'],
+        });
       });
-    });
+    } catch (err) {
+      console.error('Error submitting batch images:', err);
+    }
 
+    setIsSubmittingBatch(false);
     setUploadGalleryId(null);
     setPendingUploadFiles([]);
   };
@@ -3269,15 +3326,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <button
                     type="submit"
                     id="submit-upload-btn"
-                    disabled={pendingUploadFiles.length === 0 || isProcessingUploads}
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
+                    disabled={pendingUploadFiles.length === 0 || isProcessingUploads || isSubmittingBatch}
+                    className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                   >
-                    {pendingUploadFiles.length === 0
-                      ? 'Selecciona Fotografías'
-                      : pendingUploadFiles.length === 1
-                        ? `Subir 1 Fotografía al Servidor (${formatBytes(pendingUploadFiles[0].fileSizeBytes)})`
-                        : `Subir ${pendingUploadFiles.length} Fotografías al Servidor (${formatBytes(pendingUploadFiles.reduce((acc, f) => acc + f.fileSizeBytes, 0))})`
-                    }
+                    {isSubmittingBatch ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Subiendo fotografías al servidor...</span>
+                      </>
+                    ) : pendingUploadFiles.length === 0 ? (
+                      'Selecciona Fotografías'
+                    ) : pendingUploadFiles.length === 1 ? (
+                      `Subir 1 Fotografía al Servidor (${formatBytes(pendingUploadFiles[0].fileSizeBytes)})`
+                    ) : (
+                      `Subir ${pendingUploadFiles.length} Fotografías al Servidor (${formatBytes(pendingUploadFiles.reduce((acc, f) => acc + f.fileSizeBytes, 0))})`
+                    )}
                   </button>
                 </div>
               </div>

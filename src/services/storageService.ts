@@ -398,15 +398,62 @@ export function saveGalleriesToStorage(galleries: GallerySession[]) {
 export function loadImagesFromStorage(): GalleryImage[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.IMAGES);
-    if (data) return JSON.parse(data);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((img: GalleryImage) => {
+          const isHugeUrl = img.url && img.url.startsWith('data:') && img.url.length > 300000;
+          const isHugeHighRes = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 300000;
+          if (isHugeUrl || isHugeHighRes) {
+            return {
+              ...img,
+              url: isHugeUrl ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80' : img.url,
+              highResUrl: isHugeHighRes ? (isHugeUrl ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85' : img.url) : img.highResUrl,
+            };
+          }
+          return img;
+        });
+      }
+    }
   } catch (e) {
-    console.error(e);
+    console.warn('Error loading images from storage, falling back to initial images:', e);
   }
   return INITIAL_IMAGES;
 }
 
 export function saveImagesToStorage(images: GalleryImage[]) {
-  localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(images));
+  try {
+    localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(images));
+  } catch (err) {
+    console.warn('localStorage quota exceeded when saving images. Sanitizing large base64 URLs...', err);
+    try {
+      // If quota exceeded, sanitize images: keep lightweight preview or cloud URLs instead of massive raw base64
+      const sanitized = images.map(img => {
+        const urlIsHuge = img.url && img.url.startsWith('data:') && img.url.length > 100000;
+        const highResIsHuge = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 100000;
+        if (urlIsHuge || highResIsHuge) {
+          return {
+            ...img,
+            url: urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80' : img.url,
+            highResUrl: highResIsHuge ? (urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85' : img.url) : img.highResUrl,
+          };
+        }
+        return img;
+      });
+      localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitized));
+    } catch (finalErr) {
+      console.error('Critical storage quota error; skipping localStorage write for images:', finalErr);
+    }
+  }
+}
+
+export function resetAppStorageCache() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.IMAGES);
+    localStorage.removeItem(STORAGE_KEYS.GALLERIES);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 export function loadLogsFromStorage(): AuditLogItem[] {

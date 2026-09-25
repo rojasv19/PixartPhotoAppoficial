@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para renovar el modal de carga de imágenes: eliminar campos manuales de título, tamaño y resolución, extraer automáticamente los metadatos reales de cada archivo, y permitir la subida múltiple simultánea tanto por selector de archivos como por arrastrar y soltar (drag & drop).",
-  "updatedAt":  "2026-09-25T18:40:24.118983508Z",
+  "summary":  "Plan para corregir el error de pantalla en blanco al subir imágenes en lote: optimización de previews en canvas sin saturar localStorage/WebSockets, protección contra QuotaExceededError en storageService, y creación de un ErrorBoundary protector con recuperación automática.",
+  "updatedAt":  "2026-09-25T19:55:38.953765586Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
