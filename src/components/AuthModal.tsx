@@ -252,6 +252,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span>{modalTexts.submitLoginText || 'Iniciar Sesión'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            {/* Quick Fill Demo Admin Accounts */}
+            <div className={`pt-2 border-t text-xs ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+              <span className={`block text-[11px] font-medium mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Acceso rápido demo:
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('admin@somospixart.com');
+                    setPassword('admin2026');
+                    setAuthError(null);
+                  }}
+                  className={`p-2 rounded-xl border text-left transition-colors cursor-pointer text-[11px] ${
+                    isDark 
+                      ? 'bg-slate-900/80 border-slate-800 hover:border-slate-600 text-slate-200' 
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                  title="Maurely Carmona (admin@somospixart.com)"
+                >
+                  <span className="font-semibold block truncate">Maurely Carmona</span>
+                  <span className="text-[10px] text-slate-400 block truncate">admin@somospixart.com</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('victor@somospixart.com');
+                    setPassword('admin2026');
+                    setAuthError(null);
+                  }}
+                  className={`p-2 rounded-xl border text-left transition-colors cursor-pointer text-[11px] ${
+                    isDark 
+                      ? 'bg-slate-900/80 border-slate-800 hover:border-slate-600 text-slate-200' 
+                      : 'bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'
+                  }`}
+                  title="Victor Rojas (victor@somospixart.com)"
+                >
+                  <span className="font-semibold block truncate">Victor Rojas</span>
+                  <span className="text-[10px] text-slate-400 block truncate">victor@somospixart.com</span>
+                </button>
+              </div>
+            </div>
           </form>
         )}
 

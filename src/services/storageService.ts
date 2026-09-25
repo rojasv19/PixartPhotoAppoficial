@@ -3,12 +3,12 @@ import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, A
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  USERS: 'somos_pixart_users_v3',
+  USERS: 'somos_pixart_users_v4',
   GALLERIES: 'somos_pixart_galleries_v3',
   IMAGES: 'somos_pixart_images_v3',
-  LOGS: 'somos_pixart_logs_v3',
-  NOTIFICATIONS: 'somos_pixart_notifications_v3',
-  CURRENT_USER: 'somos_pixart_auth_user_v3',
+  LOGS: 'somos_pixart_logs_v4',
+  NOTIFICATIONS: 'somos_pixart_notifications_v4',
+  CURRENT_USER: 'somos_pixart_auth_user_v4',
   SERVER_QUOTA: 'somos_pixart_server_quota_v3',
 };
 
