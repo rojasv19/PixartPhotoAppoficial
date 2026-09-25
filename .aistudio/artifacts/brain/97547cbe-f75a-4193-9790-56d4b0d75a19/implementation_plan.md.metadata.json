@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para actualizar la cuenta de administrador principal a Maurely Carmona y registrar a Victor Rojas como nuevo co-administrador con la contraseña admin2026.",
-  "updatedAt":  "2026-09-25T13:20:03.449211603Z",
+  "summary":  "Plan para eliminar los accesos directos de 1-clic a las cuentas de administrador del modal de autenticación, asegurando que el acceso administrativo requiera siempre introducir credenciales manualmente.",
+  "updatedAt":  "2026-09-25T13:44:54.195448492Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

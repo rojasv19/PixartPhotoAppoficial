@@ -33,6 +33,44 @@ export function toUuid(input: string): string {
 }
 
 /**
+ * Ensures all defined INITIAL_USERS (especially administrators Maurely Carmona and Victor Rojas)
+ * are synced and up-to-date in InstantDB with their latest passwords, roles, and profiles.
+ */
+export async function syncAdminUsersToDb() {
+  try {
+    const transactions = [];
+    for (const u of INITIAL_USERS) {
+      const userUuid = toUuid(u.id);
+      const assignedUuids = (u.assignedGalleryIds || []).map(gid => toUuid(gid));
+      transactions.push(
+        tx.users[userUuid].update({
+          name: u.name,
+          email: u.email,
+          password: u.password || 'admin2026',
+          role: u.role,
+          avatar: u.avatar || '',
+          phone: u.phone || '',
+          company: u.company || '',
+          assignedGalleryIds: assignedUuids,
+          status: u.status || 'active',
+          createdDate: u.createdDate || new Date().toISOString().split('T')[0],
+          lastLogin: u.lastLogin || '',
+          notes: u.notes || '',
+          canDownloadHighRes: u.canDownloadHighRes ?? true,
+          canLeaveFeedback: u.canLeaveFeedback ?? true,
+          canSelectFavorites: u.canSelectFavorites ?? true,
+        })
+      );
+    }
+    await db.transact(transactions);
+    return true;
+  } catch (err) {
+    console.error('Error syncing admin users to InstantDB:', err);
+    return false;
+  }
+}
+
+/**
  * Checks if InstantDB needs initial seed data and populates it.
  */
 export async function seedInitialDataIfEmpty(
@@ -40,6 +78,8 @@ export async function seedInitialDataIfEmpty(
   existingUsersCount: number
 ) {
   if (existingGalleriesCount > 0 && existingUsersCount > 0) {
+    // Even if existing users exist, make sure admin accounts are always synchronized
+    syncAdminUsersToDb().catch(e => console.error(e));
     return false;
   }
 

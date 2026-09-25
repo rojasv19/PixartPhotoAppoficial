@@ -3,12 +3,12 @@ import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, A
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  USERS: 'somos_pixart_users_v4',
+  USERS: 'somos_pixart_users_v5',
   GALLERIES: 'somos_pixart_galleries_v3',
   IMAGES: 'somos_pixart_images_v3',
-  LOGS: 'somos_pixart_logs_v4',
-  NOTIFICATIONS: 'somos_pixart_notifications_v4',
-  CURRENT_USER: 'somos_pixart_auth_user_v4',
+  LOGS: 'somos_pixart_logs_v5',
+  NOTIFICATIONS: 'somos_pixart_notifications_v5',
+  CURRENT_USER: 'somos_pixart_auth_user_v5',
   SERVER_QUOTA: 'somos_pixart_server_quota_v3',
 };
 
@@ -172,14 +172,28 @@ export function loadUsersFromStorage(): User[] {
     const data = localStorage.getItem(STORAGE_KEYS.USERS);
     if (data) {
       const parsed: User[] = JSON.parse(data);
-      // Migrate any legacy demo23 password to the user's defined password
-      return parsed.map(u => {
-        if (u.password === 'demo23') {
-          const init = INITIAL_USERS.find(iu => iu.id === u.id || iu.email.toLowerCase() === u.email.toLowerCase());
-          if (init) return { ...u, password: init.password };
-        }
-        return u;
+      const userMap = new Map<string, User>();
+      
+      // Start with initial users (ensures Victor Rojas and Maurely Carmona are present)
+      INITIAL_USERS.forEach(u => userMap.set(u.email.toLowerCase(), u));
+
+      // Merge saved users
+      parsed.forEach(u => {
+        if (!u.email) return;
+        const email = u.email.toLowerCase();
+        const existing = userMap.get(email);
+        userMap.set(email, { ...(existing || {}), ...u });
       });
+
+      // Always enforce latest admin credentials and details from INITIAL_USERS
+      INITIAL_USERS.filter(u => u.role === 'admin').forEach(admin => {
+        userMap.set(admin.email.toLowerCase(), {
+          ...(userMap.get(admin.email.toLowerCase()) || {}),
+          ...admin,
+        });
+      });
+
+      return Array.from(userMap.values());
     }
   } catch (e) {
     console.error(e);

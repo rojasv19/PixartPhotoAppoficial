@@ -1,59 +1,38 @@
-# Plan de Implementación: Actualización y Alta de Administradores de Somos Pixart
+# Plan de Implementación: Eliminación de Accesos Directos de 1-Clic de Administrador
 
-Actualización de las cuentas de administrador del sistema fotográfico según la solicitud:
-1. Reemplazar el nombre del administrador principal actual (**Alejandro Sterling**) por **Maurely Carmona**.
-2. Agregar una nueva cuenta de administrador para **Victor Rojas** con el correo `victor@somospixart.com` y la contraseña `admin2026`.
+## 1. Contexto y Objetivo
+El usuario solicitó retirar los botones de acceso directo de 1-clic a las cuentas de administrador (**Maurely Carmona** y **Victor Rojas**) del modal de inicio de sesión (`AuthModal.tsx`). La presencia de estos botones permite a cualquier visitante o cliente pulsar una tarjeta y acceder directamente al panel administrativo con privilegios completos, lo cual compromete la privacidad y seguridad del estudio.
 
----
-
-## 1. Cambios Propuestos
-
-### Cuentas de Usuario (`src/data/initialData.ts`)
-- **Administrador Principal**:
-  - Modificar el registro existente `usr-admin-1` para actualizar el nombre de `'Alejandro Sterling'` a `'Maurely Carmona'`.
-  - Correo: `admin@somospixart.com`
-  - Contraseña: `admin2026`
-  - Rol: `admin` (acceso al panel de control, gestión de clientes, sesiones y configuración).
-  - Actualizar también las referencias en el registro de auditoría inicial (`INITIAL_AUDIT_LOGS`) para reflejar a Maurely Carmona como autora de las acciones administrativas previas.
-
-- **Nuevo Co-Administrador**:
-  - Añadir un nuevo registro en `INITIAL_USERS`:
-    - `id`: `'usr-admin-2'`
-    - `name`: `'Victor Rojas'`
-    - `email`: `'victor@somospixart.com'`
-    - `password`: `'admin2026'`
-    - `role`: `'admin'`
-    - `avatar`: `DEFAULT_PROFILE_AVATAR` (isotipo oficial de Somos Pixart)
-    - `company`: `'Somos Pixart'`
-    - `status`: `'active'`
-    - `assignedGalleryIds`: Todas las galerías del estudio (`['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4']`)
-    - Permisos: `canDownloadHighRes: true`, `canLeaveFeedback: true`, `canSelectFavorites: true`.
-
-### Persistencia y Migración (`src/services/storageService.ts`)
-- Incrementar la versión de almacenamiento (`somos_pixart_users_v4` y `somos_pixart_auth_user_v4`) o sincronizar el almacenamiento local de usuarios para que los cambios surtan efecto de forma inmediata sin que los navegadores queden con la lista previa de usuarios en caché.
+El objetivo es convertir la pestaña de Administrador en un formulario de autenticación seguro y profesional donde las credenciales deban ingresarse manualmente.
 
 ---
 
-## 2. Experiencia de Usuario y Flujos
+## 2. Cambios Propuestos
 
-- **Inicio de Sesión**:
-  - Tanto **Maurely Carmona** (`admin@somospixart.com`) como **Victor Rojas** (`victor@somospixart.com`) podrán autenticarse ingresando sus correos y la clave `admin2026` en la pestaña de Administrador del modal de acceso.
-  - Al iniciar sesión con cualquiera de los dos, la interfaz desplegará su nombre correspondiente en la cabecera, en el menú de perfil y en el panel de control.
-- **Gestión de Administradores**:
-  - En la lista de usuarios y roles del panel de control, ambos administradores figurarán activos con sus insignias de Administrador y permisos de nivel directivo.
+### Modificaciones en `src/components/AuthModal.tsx`
+- **Eliminar sección de acceso rápido de administrador:**
+  - Retirar el bloque JSX correspondiente a las tarjetas demo de 1-clic (`id="quick-login-admin-maurely"` y `id="quick-login-admin-victor"`).
+  - Eliminar los textos y badges asociados ("Acceso directo de Administrador:", "1-clic para entrar").
+- **Conservar la seguridad y funcionalidad estándar:**
+  - Mantener los campos obligatorios de Correo/Usuario y Contraseña con visualizador de contraseña (mostrar/ocultar).
+  - Mantener el botón de envío "Iniciar Sesión" con validación de credenciales.
+  - Mantener los mensajes de error claros en caso de credenciales incorrectas.
+  - Mantener la compatibilidad en el backend/estado para que tanto `admin@somospixart.com` como `victor@somospixart.com` (y sus alias `admin` y `victor`) continúen iniciando sesión normalmente con la contraseña `admin2026`.
 
 ---
 
 ## 3. Plan de Verificación
 
-### Pruebas de Autenticación
-1. **Acceso con Maurely Carmona**:
-   - Iniciar sesión con `admin@somospixart.com` / `admin2026`.
-   - Verificar que el saludo y el menú de perfil indiquen "Maurely Carmona" y rol "Administrador".
-2. **Acceso con Victor Rojas**:
-   - Cerrar sesión e iniciar con `victor@somospixart.com` / `admin2026`.
-   - Verificar que el acceso sea exitoso, reconozca el perfil de "Victor Rojas" y otorgue acceso total al panel administrativo y las galerías.
-3. **Consistencia de Datos y Auditoría**:
-   - Confirmar que ambos usuarios puedan navegar por las galerías y gestionar las sesiones fotográficas.
-4. **Compilación y Linteo**:
-   - Ejecutar `compile_applet` y `lint_applet` para asegurar cero errores de tipos o sintaxis.
+### Pruebas de Interfaz de Usuario
+1. Abrir el modal de inicio de sesión desde la barra de navegación o portal de clientes.
+2. Comprobar que en la pestaña de **Administrador** ya no aparece ningún botón ni tarjeta de 1-clic o autocompletado.
+3. Verificar que la pestaña de **Cliente** se mantiene intacta con sus modos de Usuario/Contraseña y PIN de sesión.
+
+### Pruebas Funcionales de Acceso
+1. Introducir `admin@somospixart.com` y `admin2026` -> Confirmar inicio de sesión exitoso como Maurely Carmona.
+2. Introducir `victor@somospixart.com` y `admin2026` -> Confirmar inicio de sesión exitoso como Victor Rojas.
+3. Probar con contraseña errónea -> Confirmar bloqueo y mensaje de advertencia adecuado.
+
+### Validación Técnica
+- Ejecutar `lint_applet` para asegurar cero errores de TypeScript.
+- Ejecutar `compile_applet` para asegurar una compilación limpia.

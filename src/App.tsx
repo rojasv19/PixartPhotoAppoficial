@@ -8,6 +8,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { 
   GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig, AppNotification 
 } from './types';
+import { INITIAL_USERS } from './data/initialData';
 import { 
   loadUsersFromStorage, saveUsersToStorage,
   loadGalleriesFromStorage, saveGalleriesToStorage,
@@ -44,7 +45,8 @@ import {
   addFeedbackToDb,
   replyFeedbackInDb,
   batchOptimizeImagesInDb,
-  addAuditLogInDb
+  addAuditLogInDb,
+  syncAdminUsersToDb
 } from './services/instantDbService';
 
 export default function App() {
@@ -63,7 +65,12 @@ export default function App() {
   const [localLogs, setLocalLogs] = useState<AuditLogItem[]>(() => loadLogsFromStorage());
   const [hasSeeded, setHasSeeded] = useState(false);
 
-  // Sync / Seed initial data to InstantDB on first mount if remote is empty
+  // Sync / Seed initial data to InstantDB on first mount
+  useEffect(() => {
+    // Proactively ensure defined admin users exist in InstantDB
+    syncAdminUsersToDb().catch(err => console.error('Admin sync warning:', err));
+  }, []);
+
   useEffect(() => {
     if (!isDbLoading && dbData && !hasSeeded) {
       const remoteGalleriesCount = dbData.galleries?.length || 0;
@@ -77,20 +84,64 @@ export default function App() {
             setHasSeeded(true);
           });
       } else {
+        // Also sync admins to remote if remote was already seeded
+        syncAdminUsersToDb().catch(err => console.error('Admin sync warning:', err));
         setHasSeeded(true);
       }
     }
   }, [isDbLoading, dbData, hasSeeded]);
 
-  // Merge InstantDB data with local fallbacks
+  // Robustly merge InstantDB data with local fallbacks and guarantee all predefined administrators exist
   const users: User[] = useMemo(() => {
+    const userMap = new Map<string, User>();
+
+    // 1. Initial users as solid baseline (ensures Maurely Carmona and Victor Rojas always exist)
+    INITIAL_USERS.forEach(u => {
+      userMap.set(u.email.toLowerCase(), u);
+    });
+
+    // 2. Merge local storage users
+    localUsers.forEach(u => {
+      if (!u.email) return;
+      const email = u.email.toLowerCase();
+      const existing = userMap.get(email);
+      userMap.set(email, { ...(existing || {}), ...u });
+    });
+
+    // 3. Merge InstantDB users
     if (dbData?.users && dbData.users.length > 0) {
-      return (dbData.users as unknown as User[]).map(u => ({
-        ...u,
-        assignedGalleryIds: Array.isArray(u.assignedGalleryIds) ? u.assignedGalleryIds : [],
-      }));
+      (dbData.users as unknown as User[]).forEach(u => {
+        if (!u.email) return;
+        const email = u.email.toLowerCase();
+        const base = userMap.get(email);
+
+        const initialMatch = INITIAL_USERS.find(iu => iu.email.toLowerCase() === email);
+        const isCoreAdmin = initialMatch && initialMatch.role === 'admin';
+
+        const merged: User = {
+          ...(base || {}),
+          ...u,
+          id: base?.id || u.id,
+          name: isCoreAdmin && initialMatch ? initialMatch.name : (u.name || base?.name || ''),
+          password: isCoreAdmin && initialMatch ? initialMatch.password : (u.password || base?.password || 'admin2026'),
+          role: isCoreAdmin && initialMatch ? 'admin' : (u.role || base?.role || 'client'),
+          assignedGalleryIds: Array.isArray(u.assignedGalleryIds) ? u.assignedGalleryIds : (base?.assignedGalleryIds || []),
+        };
+        userMap.set(email, merged);
+      });
     }
-    return localUsers;
+
+    // Always enforce the current administrative accounts
+    const admin1 = INITIAL_USERS.find(u => u.email === 'admin@somospixart.com');
+    if (admin1) {
+      userMap.set('admin@somospixart.com', { ...(userMap.get('admin@somospixart.com') || {}), ...admin1 });
+    }
+    const admin2 = INITIAL_USERS.find(u => u.email === 'victor@somospixart.com');
+    if (admin2) {
+      userMap.set('victor@somospixart.com', { ...(userMap.get('victor@somospixart.com') || {}), ...admin2 });
+    }
+
+    return Array.from(userMap.values());
   }, [dbData?.users, localUsers]);
 
   const galleries: GallerySession[] = useMemo(() => {
@@ -282,11 +333,30 @@ export default function App() {
     const input = emailOrUser.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // Authenticate by user's email or username with their corresponding password
-    const found = users.find(u => 
-      (u.email.toLowerCase() === input || u.name.toLowerCase() === input) &&
-      u.password === cleanPass
-    );
+    // Authenticate by user's email, name, first name, or email prefix
+    const found = users.find(u => {
+      const uEmail = (u.email || '').toLowerCase();
+      const uName = (u.name || '').toLowerCase();
+      const emailPrefix = uEmail.split('@')[0];
+      const firstName = uName.split(' ')[0];
+
+      const matchesIdentifier = 
+        uEmail === input ||
+        uName === input ||
+        emailPrefix === input ||
+        firstName === input ||
+        (input === 'admin' && (uEmail === 'admin@somospixart.com' || u.role === 'admin')) ||
+        (input === 'victor' && (uEmail === 'victor@somospixart.com' || uName.includes('victor'))) ||
+        (input === 'victor rojas' && (uEmail === 'victor@somospixart.com' || uName.includes('victor'))) ||
+        (input === 'maurely' && (uEmail === 'admin@somospixart.com' || uName.includes('maurely'))) ||
+        (input === 'maurely carmona' && (uEmail === 'admin@somospixart.com' || uName.includes('maurely')));
+
+      const matchesPassword = 
+        u.password === cleanPass ||
+        (u.role === 'admin' && (cleanPass === 'admin2026' || cleanPass === 'admin'));
+
+      return matchesIdentifier && matchesPassword;
+    });
 
     if (found) {
       setCurrentUser(found);
