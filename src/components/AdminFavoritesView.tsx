@@ -3,7 +3,7 @@ import {
   Heart, Download, Copy, Check, Filter, Search, Eye, Sparkles, 
   ExternalLink, Layers, CheckCircle2, Clock, Palette, ArrowRight,
   FolderDown, Sliders, RefreshCw, FileSpreadsheet, FileText, UserCheck, 
-  Camera, MessageSquare, AlertCircle
+  Camera, MessageSquare, AlertCircle, Trash2, CheckCheck, Undo2, X, RotateCcw
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, StudioBrandingConfig, RetouchStatus } from '../types';
 import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../services/storageService';
@@ -32,15 +32,20 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
   const isDark = theme === 'dark';
   const colorTheme = branding ? COLOR_PRESET_MAP[branding.colorPreset] || COLOR_PRESET_MAP.blue : COLOR_PRESET_MAP.blue;
 
-  // Search & Filter State
+  // Search & Filter State (Default to 'pending' as requested)
   const [selectedGalleryId, setSelectedGalleryId] = useState<string>('all');
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedFilenames, setCopiedFilenames] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
   const [zipProgress, setZipProgress] = useState<number>(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
+
+  // Modals & Feedback Toasts
+  const [showBatchCompleteModal, setShowBatchCompleteModal] = useState<boolean>(false);
+  const [showClearCompletedModal, setShowClearCompletedModal] = useState<boolean>(false);
+  const [actionToast, setActionToast] = useState<{ message: string; undoAction?: () => void } | null>(null);
 
   // Local retouch status & notes overrides if onUpdateImage isn't persisted yet
   const [retouchOverrides, setRetouchOverrides] = useState<Record<string, { status: RetouchStatus; notes: string }>>({});
@@ -129,9 +134,19 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
         if (!hasClient) return false;
       }
 
-      // Retouch status filter
-      if (statusFilter !== 'all' && entry.retouchStatus !== statusFilter) {
-        return false;
+      // Retouch status filter (Pending shows pending & in_progress; Completed shows completed & delivered)
+      if (statusFilter === 'pending') {
+        if (entry.retouchStatus !== 'pending' && entry.retouchStatus !== 'in_progress') {
+          return false;
+        }
+      } else if (statusFilter === 'completed') {
+        if (entry.retouchStatus !== 'completed' && entry.retouchStatus !== 'delivered') {
+          return false;
+        }
+      } else if (statusFilter !== 'all') {
+        if (entry.retouchStatus !== statusFilter) {
+          return false;
+        }
       }
 
       // Search query filter (filename, title, client name, gallery title, notes)
@@ -173,6 +188,115 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
         });
       }
     }
+  };
+
+  // Mark single image as ready (disappears from pending view)
+  const handleMarkAsReady = (imageId: string) => {
+    const prevStatus = favoriteEntries.find(f => f.image.id === imageId)?.retouchStatus || 'pending';
+    handleUpdateStatus(imageId, 'completed');
+
+    setActionToast({
+      message: 'Fotografía marcada como lista y movida a "Completadas".',
+      undoAction: () => {
+        handleUpdateStatus(imageId, prevStatus);
+        setActionToast(null);
+      }
+    });
+
+    setTimeout(() => {
+      setActionToast(prev => (prev?.message.includes('lista') ? null : prev));
+    }, 4500);
+  };
+
+  // Remove single image from favorites
+  const handleRemoveSingleFavorite = (imageId: string) => {
+    const target = images.find(img => img.id === imageId);
+    if (!target) return;
+
+    if (onUpdateImage) {
+      onUpdateImage({
+        ...target,
+        favoriteByUsers: [],
+      });
+      setActionToast({
+        message: `Fotografía "${target.title}" retirada de la selección de favoritas.`
+      });
+      setTimeout(() => {
+        setActionToast(prev => (prev?.message.includes('retirada') ? null : prev));
+      }, 3500);
+    }
+  };
+
+  // Batch mark all pending as completed
+  const handleBatchMarkAllCompleted = () => {
+    const pendingEntries = filteredFavorites.filter(
+      e => e.retouchStatus === 'pending' || e.retouchStatus === 'in_progress'
+    );
+    if (pendingEntries.length === 0) {
+      setShowBatchCompleteModal(false);
+      return;
+    }
+
+    const newOverrides = { ...retouchOverrides };
+    pendingEntries.forEach(entry => {
+      newOverrides[entry.image.id] = {
+        status: 'completed',
+        notes: entry.retouchNotes || '',
+      };
+      if (onUpdateImage) {
+        const target = images.find(img => img.id === entry.image.id);
+        if (target) {
+          const cleanTags = (target.tags || []).filter(
+            t => t !== 'editado' && t !== 'en_edicion' && t !== 'pendiente'
+          );
+          cleanTags.push('editado');
+          onUpdateImage({
+            ...target,
+            tags: cleanTags,
+          });
+        }
+      }
+    });
+
+    setRetouchOverrides(newOverrides);
+    setShowBatchCompleteModal(false);
+    setActionToast({
+      message: `¡Listo! Se marcaron ${pendingEntries.length} fotografías pendientes como listas.`
+    });
+    setTimeout(() => {
+      setActionToast(prev => (prev?.message.includes('marcaron') ? null : prev));
+    }, 4500);
+  };
+
+  // Batch clear all completed from favorites
+  const handleClearAllCompleted = () => {
+    const completedEntries = favoriteEntries.filter(
+      e => e.retouchStatus === 'completed' || e.retouchStatus === 'delivered'
+    );
+    if (completedEntries.length === 0) {
+      setShowClearCompletedModal(false);
+      return;
+    }
+
+    completedEntries.forEach(entry => {
+      if (onUpdateImage) {
+        const target = images.find(img => img.id === entry.image.id);
+        if (target) {
+          onUpdateImage({
+            ...target,
+            favoriteByUsers: [],
+          });
+        }
+      }
+    });
+
+    setShowClearCompletedModal(false);
+    setActionToast({
+      message: `Se limpiaron ${completedEntries.length} fotografías del historial de completadas.`
+    });
+    setTimeout(() => {
+      setActionToast(prev => (prev?.message.includes('limpiaron') ? null : prev));
+    }, 4500);
   };
 
   // Update Retouch Notes
@@ -267,9 +391,10 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
   };
 
   // Statistics
-  const pendingCount = favoriteEntries.filter(f => f.retouchStatus === 'pending').length;
+  const pendingCount = favoriteEntries.filter(f => f.retouchStatus === 'pending' || f.retouchStatus === 'in_progress').length;
   const inProgressCount = favoriteEntries.filter(f => f.retouchStatus === 'in_progress').length;
   const completedCount = favoriteEntries.filter(f => f.retouchStatus === 'completed' || f.retouchStatus === 'delivered').length;
+  const totalCount = favoriteEntries.length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -458,6 +583,137 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
         </div>
       )}
 
+      {/* Action Toast Alert with Undo */}
+      {actionToast && (
+        <div 
+          id="favorites-action-toast"
+          className={`flex items-center justify-between gap-4 p-4 rounded-2xl border shadow-lg animate-in slide-in-from-top-2 duration-200 ${
+            isDark ? 'bg-stone-900 border-emerald-500/40 text-stone-100' : 'bg-white border-emerald-400 text-slate-900'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Check className="w-4 h-4" />
+            </div>
+            <p className="text-xs font-medium">{actionToast.message}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {actionToast.undoAction && (
+              <button
+                type="button"
+                onClick={actionToast.undoAction}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 cursor-pointer transition-all"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span>Deshacer</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActionToast(null)}
+              className="p-1 rounded-lg text-stone-400 hover:text-stone-200 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Workflow Tabs: Pendientes (Default), Completadas, Todas + Batch Action Buttons */}
+      <div className={`p-4 rounded-3xl border shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 transition-colors ${
+        isDark ? 'bg-[#181A1D] border-slate-800' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+          <button
+            type="button"
+            id="tab-favorites-pending"
+            onClick={() => setStatusFilter('pending')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'pending'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Pendientes</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-code font-bold ${
+              statusFilter === 'pending' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {pendingCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-favorites-completed"
+            onClick={() => setStatusFilter('completed')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'completed'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Completadas</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-code font-bold ${
+              statusFilter === 'completed' ? 'bg-white/20 text-white' : 'bg-slate-800 text-emerald-400'
+            }`}>
+              {completedCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-favorites-all"
+            onClick={() => setStatusFilter('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Todas</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-code font-bold ${
+              statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
+            }`}>
+              {totalCount}
+            </span>
+          </button>
+        </div>
+
+        {/* Tab-Specific Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          {statusFilter === 'pending' && (
+            <button
+              type="button"
+              id="admin-mark-all-ready-btn"
+              disabled={pendingCount === 0}
+              onClick={() => setShowBatchCompleteModal(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+              title="Marcar todas las fotos pendientes como listas al mismo tiempo"
+            >
+              <CheckCheck className="w-4 h-4" />
+              <span>Marcar todas como listas ({pendingCount})</span>
+            </button>
+          )}
+
+          {statusFilter === 'completed' && (
+            <button
+              type="button"
+              id="admin-clear-completed-btn"
+              disabled={completedCount === 0}
+              onClick={() => setShowClearCompletedModal(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold shadow-xs cursor-pointer transition-all"
+              title="Limpiar todas las fotos completadas de la selección de favoritas"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Limpiar todas las completadas ({completedCount})</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Filter & Search Bar */}
       <div className={`p-4 rounded-2xl border shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 transition-colors ${
         isDark ? 'bg-[#181A1D] border-slate-800' : 'bg-white border-slate-200'
@@ -498,28 +754,12 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
             ))}
           </select>
 
-          {/* Status Filter */}
-          <select
-            id="admin-fav-status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`px-3 py-2 rounded-xl text-xs border font-medium focus:outline-none cursor-pointer ${
-              isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-            }`}
-          >
-            <option value="all">Todos los Estados</option>
-            <option value="pending">⏳ Pendiente de Edición</option>
-            <option value="in_progress">🎨 En Proceso de Retoque</option>
-            <option value="completed">✅ Retoque Finalizado</option>
-            <option value="delivered">🚀 Entregado al Cliente</option>
-          </select>
-
-          {(selectedGalleryId !== 'all' || selectedClientId !== 'all' || statusFilter !== 'all' || searchQuery.trim()) && (
+          {/* Quick Clear Filters */}
+          {(selectedGalleryId !== 'all' || selectedClientId !== 'all' || searchQuery.trim()) && (
             <button
               onClick={() => {
                 setSelectedGalleryId('all');
                 setSelectedClientId('all');
-                setStatusFilter('all');
                 setSearchQuery('');
               }}
               className="px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
@@ -537,14 +777,44 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
           isDark ? 'bg-[#181A1D] border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
-            <Heart className="w-8 h-8" />
+            {statusFilter === 'pending' ? <CheckCircle2 className="w-8 h-8 text-emerald-400" /> : <Heart className="w-8 h-8" />}
           </div>
           <h3 className={`text-lg font-bold font-serif-display ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            No se encontraron fotografías favoritas con los filtros seleccionados
+            {statusFilter === 'pending' 
+              ? (pendingCount === 0 ? '¡Todo al día! No tienes fotografías pendientes de retoque' : 'No hay fotografías pendientes con los filtros aplicados')
+              : statusFilter === 'completed'
+              ? (completedCount === 0 ? 'No hay fotografías en el historial de completadas' : 'No hay fotos completadas con los filtros aplicados')
+              : 'No se encontraron fotografías favoritas'}
           </h3>
           <p className={`text-xs max-w-md mx-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Cuando los clientes exploren sus sesiones privadas y marquen fotos con el corazón, aparecerán aquí automáticamente organizadas para su edición y retoque final.
+            {statusFilter === 'pending' && pendingCount === 0 && completedCount > 0 ? (
+              <span>Todas las fotos seleccionadas por clientes han sido procesadas. Puedes consultarlas o descargarlas en la pestaña de completadas.</span>
+            ) : statusFilter === 'completed' && completedCount === 0 && pendingCount > 0 ? (
+              <span>Actualmente tienes {pendingCount} fotos en la bandeja de pendientes esperando ser marcadas como listas.</span>
+            ) : (
+              <span>Ajusta la búsqueda o selecciona otra galería para revisar las favoritas.</span>
+            )}
           </p>
+          {statusFilter === 'pending' && pendingCount === 0 && completedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('completed')}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md cursor-pointer transition-all inline-flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Ver fotos completadas ({completedCount})</span>
+            </button>
+          )}
+          {statusFilter === 'completed' && completedCount === 0 && pendingCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('pending')}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md cursor-pointer transition-all inline-flex items-center gap-2"
+            >
+              <Clock className="w-4 h-4" />
+              <span>Ver fotos pendientes ({pendingCount})</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -698,12 +968,13 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                       </button>
 
                       <button
-                        onClick={() => handleUpdateStatus(image.id, 'completed')}
+                        onClick={() => handleMarkAsReady(image.id)}
                         className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
                           retouchStatus === 'completed' || retouchStatus === 'delivered'
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
                             : isDark ? 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
                         }`}
+                        title="Marcar como lista (se archiva y sale de la vista de pendientes)"
                       >
                         ✅ Listo
                       </button>
@@ -731,17 +1002,49 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                   </div>
 
                   {/* Card Action Footer */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(image.originalFileName || image.title);
-                      }}
-                      className="text-slate-400 hover:text-blue-400 flex items-center gap-1 font-mono-code text-[11px] cursor-pointer"
-                      title="Copiar solo este nombre de archivo"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>Copiar RAW</span>
-                    </button>
+                  <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(image.originalFileName || image.title);
+                        }}
+                        className="text-slate-400 hover:text-blue-400 flex items-center gap-1 font-mono-code text-[11px] cursor-pointer"
+                        title="Copiar solo este nombre de archivo"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copiar RAW</span>
+                      </button>
+
+                      {/* Revert to Pending if already completed */}
+                      {(retouchStatus === 'completed' || retouchStatus === 'delivered') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUpdateStatus(image.id, 'pending');
+                            setActionToast({
+                              message: `Fotografía "${image.title}" devuelta a la bandeja de pendientes.`,
+                            });
+                            setTimeout(() => setActionToast(null), 3500);
+                          }}
+                          className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-[11px] cursor-pointer font-medium"
+                          title="Devolver a pendientes para continuar editando"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>A Pendientes</span>
+                        </button>
+                      )}
+
+                      {/* Remove single photo from favorites */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSingleFavorite(image.id)}
+                        className="text-rose-400/80 hover:text-rose-400 flex items-center gap-1 text-[11px] cursor-pointer hover:underline transition-colors"
+                        title="Eliminar de una en una de esta sección"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Quitar</span>
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => downloadSingleImage(image, 'high-res', {
@@ -832,6 +1135,128 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>{previewImage.excludeWatermark ? 'Descargar en Alta Resolución (Sin Marca)' : 'Descargar en Alta Resolución'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: BATCH MARK ALL AS COMPLETED CONFIRMATION */}
+      {showBatchCompleteModal && (
+        <div 
+          id="batch-complete-confirm-modal"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div 
+            className={`w-full max-w-md rounded-3xl border p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold font-serif-display">
+                  ¿Marcar todas las fotos como listas?
+                </h3>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Confirmación de procesado masivo
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl text-xs space-y-2 border ${
+              isDark ? 'bg-stone-950/60 border-stone-800 text-stone-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <p>
+                Se marcarán <strong className="text-emerald-400 font-bold">{pendingCount} fotografías</strong> pendientes como listas para la entrega.
+              </p>
+              <p className="text-[11px] text-stone-400">
+                Saldrán automáticamente de la bandeja de pendientes y podrás consultarlas o descargarlas en cualquier momento desde la pestaña <strong>"Completadas"</strong>.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                id="cancel-batch-complete-btn"
+                onClick={() => setShowBatchCompleteModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="confirm-batch-complete-btn"
+                onClick={handleBatchMarkAllCompleted}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center gap-2 transition-all"
+              >
+                <Check className="w-4 h-4" />
+                <span>Confirmar y Marcar Todas</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: CLEAR ALL COMPLETED CONFIRMATION */}
+      {showClearCompletedModal && (
+        <div 
+          id="clear-completed-confirm-modal"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div 
+            className={`w-full max-w-md rounded-3xl border p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold font-serif-display">
+                  ¿Limpiar todas las completadas?
+                </h3>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Vaciar el historial de fotos finalizadas
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl text-xs space-y-2 border ${
+              isDark ? 'bg-stone-950/60 border-stone-800 text-stone-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <p>
+                Se desmarcarán y limpiarán <strong className="text-rose-400 font-bold">{completedCount} fotografías</strong> del historial de completadas.
+              </p>
+              <p className="text-[11px] text-stone-400">
+                Esta acción limpia la bandeja para nuevos proyectos. Las fotos originales permanecerán seguras en sus respectivas galerías.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                id="cancel-clear-completed-btn"
+                onClick={() => setShowClearCompletedModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                  isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="confirm-clear-completed-btn"
+                onClick={handleClearAllCompleted}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 cursor-pointer flex items-center gap-2 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sí, Limpiar Completadas</span>
               </button>
             </div>
           </div>
