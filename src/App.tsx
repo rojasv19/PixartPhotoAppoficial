@@ -819,6 +819,7 @@ export default function App() {
             onToggleFavorite={handleToggleFavorite}
             onAddFeedback={handleAddFeedback}
             onUpdateGallery={handleUpdateGallery}
+            onUpdateImage={handleUpdateImage}
             onRequestLogin={() => {
               setAuthModalInitialTab('client');
               setIsAuthModalOpen(true);

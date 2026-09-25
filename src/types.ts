@@ -61,6 +61,7 @@ export interface GalleryImage {
   uploadedAt: string;
   optimized: boolean;
   clientNote?: string;
+  excludeWatermark?: boolean; // If true, watermark is removed from this photo and direct download is enabled
 }
 
 export interface GallerySession {
@@ -81,6 +82,12 @@ export interface GallerySession {
   allowDownloadHighRes: boolean;
   allowFeedback: boolean;
   allowFavoritesSubmission: boolean;
+  watermarkEnabled?: boolean;
+  watermarkType?: 'text' | 'image';
+  watermarkText?: string;
+  watermarkImageUrl?: string;
+  watermarkPosition?: 'center' | 'repeated';
+  watermarkOpacity?: number;
   maxFavoritesSelection?: number;
   clientPhotoLimits?: Record<string, number>; // Personalized favorite photo limits per client ID
   status: 'published' | 'draft' | 'archived';

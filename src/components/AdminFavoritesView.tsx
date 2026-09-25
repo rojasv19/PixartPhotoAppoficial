@@ -8,6 +8,7 @@ import {
 import { GallerySession, GalleryImage, User, StudioBrandingConfig, RetouchStatus } from '../types';
 import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../services/storageService';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
+import { WatermarkOverlay } from './WatermarkOverlay';
 
 interface AdminFavoritesViewProps {
   galleries: GallerySession[];
@@ -598,11 +599,19 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                     </button>
 
                     <button
-                      onClick={() => downloadSingleImage(image, 'high-res')}
+                      onClick={() => downloadSingleImage(image, 'high-res', {
+                        watermarkEnabled: gallery?.watermarkEnabled,
+                        excludeWatermark: image.excludeWatermark,
+                        watermarkType: gallery?.watermarkType,
+                        watermarkText: gallery?.watermarkText,
+                        watermarkImageUrl: gallery?.watermarkImageUrl,
+                        watermarkPosition: gallery?.watermarkPosition,
+                        watermarkOpacity: gallery?.watermarkOpacity,
+                      })}
                       className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xl flex items-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Descargar RAW</span>
+                      <span>{image.excludeWatermark ? 'Descargar (Sin Marca)' : 'Descargar RAW'}</span>
                     </button>
                   </div>
                 </div>
@@ -735,11 +744,19 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                     </button>
 
                     <button
-                      onClick={() => downloadSingleImage(image, 'high-res')}
+                      onClick={() => downloadSingleImage(image, 'high-res', {
+                        watermarkEnabled: gallery?.watermarkEnabled,
+                        excludeWatermark: image.excludeWatermark,
+                        watermarkType: gallery?.watermarkType,
+                        watermarkText: gallery?.watermarkText,
+                        watermarkImageUrl: gallery?.watermarkImageUrl,
+                        watermarkPosition: gallery?.watermarkPosition,
+                        watermarkOpacity: gallery?.watermarkOpacity,
+                      })}
                       className="text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Descargar Original</span>
+                      <span>{image.excludeWatermark ? 'Descargar (Sin Marca)' : 'Descargar Original'}</span>
                     </button>
                   </div>
 
@@ -773,23 +790,48 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
               </button>
             </div>
             
-            <div className="flex-1 flex items-center justify-center overflow-hidden">
+            <div className="relative flex-1 flex items-center justify-center overflow-hidden">
               <img
                 src={previewImage.highResUrl || previewImage.url}
                 alt={previewImage.title}
                 referrerPolicy="no-referrer"
                 className="max-h-[70vh] object-contain rounded-lg border border-slate-800"
               />
+              {(() => {
+                const parentGal = galleries.find(g => g.id === previewImage.galleryId);
+                return parentGal?.watermarkEnabled ? (
+                  <WatermarkOverlay
+                    watermarkEnabled={parentGal.watermarkEnabled}
+                    excludeWatermark={previewImage.excludeWatermark}
+                    watermarkType={parentGal.watermarkType}
+                    watermarkText={parentGal.watermarkText}
+                    watermarkImageUrl={parentGal.watermarkImageUrl}
+                    watermarkPosition={parentGal.watermarkPosition}
+                    watermarkOpacity={parentGal.watermarkOpacity}
+                  />
+                ) : null;
+              })()}
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
               <span className="font-mono-code">{previewImage.width} × {previewImage.height} px • {formatBytes(previewImage.fileSizeBytes)}</span>
               <button
-                onClick={() => downloadSingleImage(previewImage, 'high-res')}
+                onClick={() => {
+                  const parentGal = galleries.find(g => g.id === previewImage.galleryId);
+                  downloadSingleImage(previewImage, 'high-res', {
+                    watermarkEnabled: parentGal?.watermarkEnabled,
+                    excludeWatermark: previewImage.excludeWatermark,
+                    watermarkType: parentGal?.watermarkType,
+                    watermarkText: parentGal?.watermarkText,
+                    watermarkImageUrl: parentGal?.watermarkImageUrl,
+                    watermarkPosition: parentGal?.watermarkPosition,
+                    watermarkOpacity: parentGal?.watermarkOpacity,
+                  });
+                }}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Descargar en Alta Resolución</span>
+                <span>{previewImage.excludeWatermark ? 'Descargar en Alta Resolución (Sin Marca)' : 'Descargar en Alta Resolución'}</span>
               </button>
             </div>
           </div>

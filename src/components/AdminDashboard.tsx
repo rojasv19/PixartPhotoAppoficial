@@ -6,11 +6,12 @@ import {
   Upload, Sliders, Calendar, MapPin, Lock, FileText, Activity, Shield, RefreshCw, X, Camera, Palette, Heart
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig } from '../types';
-import { formatBytes, calculateServerStats } from '../services/storageService';
+import { formatBytes, calculateServerStats, downloadSingleImage } from '../services/storageService';
 import { COLOR_PRESET_MAP, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
 import { DEFAULT_PROFILE_AVATAR } from '../data/photographyAvatars';
 import { AdminBrandingSettings } from './AdminBrandingSettings';
 import { AdminFavoritesView } from './AdminFavoritesView';
+import { WatermarkOverlay } from './WatermarkOverlay';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -134,7 +135,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [galleryClientLimits, setGalleryClientLimits] = useState<Record<string, number>>({});
   const [galleryAllowDownload, setGalleryAllowDownload] = useState(true);
   const [galleryAllowFeedback, setGalleryAllowFeedback] = useState(true);
+  const [galleryAllowFavorites, setGalleryAllowFavorites] = useState(true);
   const [galleryMaxFavs, setGalleryMaxFavs] = useState(50);
+  const [galleryWatermarkEnabled, setGalleryWatermarkEnabled] = useState(false);
+  const [galleryWatermarkType, setGalleryWatermarkType] = useState<'text' | 'image'>('text');
+  const [galleryWatermarkText, setGalleryWatermarkText] = useState('SOMOS PIXART');
+  const [galleryWatermarkImageUrl, setGalleryWatermarkImageUrl] = useState('');
+  const [galleryWatermarkPosition, setGalleryWatermarkPosition] = useState<'center' | 'repeated'>('center');
+  const [galleryWatermarkOpacity, setGalleryWatermarkOpacity] = useState(0.35);
 
   // New Client Form State
   const [clientName, setClientName] = useState('');
@@ -145,13 +153,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [clientAvatar, setClientAvatar] = useState('');
   const [clientRole, setClientRole] = useState<User['role']>('client');
   const [clientAssignedGalleries, setClientAssignedGalleries] = useState<string[]>([]);
-  const [clientCanDownload, setClientCanDownload] = useState(true);
-  const [clientCanFeedback, setClientCanFeedback] = useState(true);
-  const [clientCanFav, setClientCanFav] = useState(true);
   const [clientNotes, setClientNotes] = useState('');
 
   // Refs for Device File Uploads
   const galleryCoverInputRef = useRef<HTMLInputElement>(null);
+  const watermarkImageInputRef = useRef<HTMLInputElement>(null);
   const clientAvatarInputRef = useRef<HTMLInputElement>(null);
   const photoUploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -163,6 +169,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.onload = (event) => {
       if (event.target?.result) {
         setGalleryCover(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleWatermarkFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setGalleryWatermarkImageUrl(event.target.result as string);
       }
     };
     reader.readAsDataURL(file);
@@ -222,6 +240,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .filter(u => gallerySelectedClients.includes(u.id))
       .map(u => u.name);
 
+    const isWatermarkOn = galleryWatermarkEnabled;
+    const effectiveAllowDownload = isWatermarkOn ? false : galleryAllowDownload;
+
     if (editingGallery) {
       onUpdateGallery({
         ...editingGallery,
@@ -235,8 +256,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         accessPin: galleryPin,
         clientIds: gallerySelectedClients,
         clientNames: assignedNames,
-        allowDownloadHighRes: galleryAllowDownload,
+        allowDownloadHighRes: effectiveAllowDownload,
         allowFeedback: galleryAllowFeedback,
+        allowFavoritesSubmission: galleryAllowFavorites,
+        watermarkEnabled: isWatermarkOn,
+        watermarkType: galleryWatermarkType,
+        watermarkText: galleryWatermarkText,
+        watermarkImageUrl: galleryWatermarkImageUrl,
+        watermarkPosition: galleryWatermarkPosition,
+        watermarkOpacity: galleryWatermarkOpacity,
         maxFavoritesSelection: galleryMaxFavs,
         clientPhotoLimits: galleryClientLimits,
       });
@@ -256,9 +284,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         description: `Sesión profesional realizada en ${galleryLocation} el ${galleryDate}.`,
         accessPin: galleryPin,
         isPasswordProtected: true,
-        allowDownloadHighRes: galleryAllowDownload,
+        allowDownloadHighRes: effectiveAllowDownload,
         allowFeedback: galleryAllowFeedback,
-        allowFavoritesSubmission: true,
+        allowFavoritesSubmission: galleryAllowFavorites,
+        watermarkEnabled: isWatermarkOn,
+        watermarkType: galleryWatermarkType,
+        watermarkText: galleryWatermarkText,
+        watermarkImageUrl: galleryWatermarkImageUrl,
+        watermarkPosition: galleryWatermarkPosition,
+        watermarkOpacity: galleryWatermarkOpacity,
         maxFavoritesSelection: galleryMaxFavs,
         clientPhotoLimits: galleryClientLimits,
         status: 'published',
@@ -280,7 +314,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setGalleryPin(String(Math.floor(1000 + Math.random() * 9000)));
     setGallerySelectedClients([]);
     setGalleryClientLimits({});
+    setGalleryAllowDownload(true);
+    setGalleryAllowFeedback(true);
+    setGalleryAllowFavorites(true);
     setGalleryMaxFavs(50);
+    setGalleryWatermarkEnabled(false);
+    setGalleryWatermarkType('text');
+    setGalleryWatermarkText('SOMOS PIXART');
+    setGalleryWatermarkImageUrl('');
+    setGalleryWatermarkPosition('center');
+    setGalleryWatermarkOpacity(0.35);
   };
 
   const openEditGalleryModal = (gal: GallerySession) => {
@@ -295,9 +338,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setGalleryPin(gal.accessPin);
     setGallerySelectedClients(gal.clientIds || []);
     setGalleryClientLimits(gal.clientPhotoLimits || {});
-    setGalleryAllowDownload(gal.allowDownloadHighRes);
-    setGalleryAllowFeedback(gal.allowFeedback);
+    setGalleryAllowDownload(gal.allowDownloadHighRes ?? true);
+    setGalleryAllowFeedback(gal.allowFeedback ?? true);
+    setGalleryAllowFavorites(gal.allowFavoritesSubmission ?? true);
     setGalleryMaxFavs(gal.maxFavoritesSelection || 50);
+    setGalleryWatermarkEnabled(gal.watermarkEnabled ?? false);
+    setGalleryWatermarkType(gal.watermarkType || 'text');
+    setGalleryWatermarkText(gal.watermarkText || 'SOMOS PIXART');
+    setGalleryWatermarkImageUrl(gal.watermarkImageUrl || '');
+    setGalleryWatermarkPosition(gal.watermarkPosition || 'center');
+    setGalleryWatermarkOpacity(gal.watermarkOpacity ?? 0.35);
     setShowNewGalleryModal(true);
   };
 
@@ -317,9 +367,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         avatar: clientAvatar || editingUser.avatar,
         role: clientRole,
         assignedGalleryIds: clientAssignedGalleries,
-        canDownloadHighRes: clientCanDownload,
-        canLeaveFeedback: clientCanFeedback,
-        canSelectFavorites: clientCanFav,
         notes: clientNotes,
       });
       setEditingUser(null);
@@ -335,9 +382,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         assignedGalleryIds: clientAssignedGalleries,
         status: 'active',
         lastLogin: 'Nunca',
-        canDownloadHighRes: clientCanDownload,
-        canLeaveFeedback: clientCanFeedback,
-        canSelectFavorites: clientCanFav,
         notes: clientNotes,
       });
     }
@@ -368,9 +412,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setClientAvatar(user.avatar || '');
     setClientRole(user.role);
     setClientAssignedGalleries(user.assignedGalleryIds || []);
-    setClientCanDownload(user.canDownloadHighRes ?? true);
-    setClientCanFeedback(user.canLeaveFeedback ?? true);
-    setClientCanFav(user.canSelectFavorites ?? true);
     setClientNotes(user.notes || '');
     setShowNewClientModal(true);
   };
@@ -1376,41 +1417,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                       </div>
 
-                      {/* Permissions badges */}
-                      <div className="space-y-1">
-                        <span className={`text-[10px] uppercase font-bold tracking-wider block ${
-                          isDark ? 'text-stone-400' : 'text-slate-500'
-                        }`}>
-                          Permisos Otorgados:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                            client.canDownloadHighRes !== false 
-                              ? isDark ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : `${colorTheme.twBadgeBg} ${colorTheme.twText} ${colorTheme.twBadgeBorder}`
-                              : isDark ? 'bg-stone-800 text-stone-500 border-transparent' : 'bg-slate-100 text-slate-400 border-slate-200'
-                          }`}>
-                            <Download className="w-2.5 h-2.5" />
-                            Descarga RAW
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                            client.canSelectFavorites !== false 
-                              ? isDark ? 'bg-rose-500/10 text-rose-300 border-rose-500/20' : 'bg-rose-50 text-rose-700 border-rose-200'
-                              : isDark ? 'bg-stone-800 text-stone-500 border-transparent' : 'bg-slate-100 text-slate-400 border-slate-200'
-                          }`}>
-                            <Star className="w-2.5 h-2.5" />
-                            Favoritas
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                            client.canLeaveFeedback !== false 
-                              ? isDark ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : isDark ? 'bg-stone-800 text-stone-500 border-transparent' : 'bg-slate-100 text-slate-400 border-slate-200'
-                          }`}>
-                            <MessageSquare className="w-2.5 h-2.5" />
-                            Feedback
-                          </span>
-                        </div>
-                      </div>
-
                       {/* Assigned Galleries */}
                       <div className="space-y-1">
                         <span className={`text-[10px] uppercase font-bold tracking-wider block ${
@@ -1651,6 +1657,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <th className="px-4 py-3">Resolución</th>
                       <th className="px-4 py-3">Cámara & Sensor</th>
                       <th className="px-4 py-3">Estado Servidor</th>
+                      <th className="px-4 py-3">Protección / Marca de Agua</th>
                       <th className="px-4 py-3 text-right">Acción</th>
                     </tr>
                   </thead>
@@ -1713,23 +1720,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </span>
                           </td>
 
+                          {/* Watermark Protection & Exemption Toggle */}
+                          <td className="px-4 py-3 font-sans">
+                            {parentGal?.watermarkEnabled ? (
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1 ${
+                                  img.excludeWatermark
+                                    ? isDark ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : isDark ? 'bg-violet-500/10 text-violet-300 border-violet-500/20' : 'bg-violet-50 text-violet-700 border-violet-200'
+                                }`}>
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  {img.excludeWatermark ? 'Sin Marca (Descargable)' : 'Con Marca de Agua'}
+                                </span>
+                                {onUpdateImage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onUpdateImage({ ...img, excludeWatermark: !img.excludeWatermark })}
+                                    className={`text-[10px] underline cursor-pointer hover:opacity-80 font-medium ${
+                                      img.excludeWatermark
+                                        ? isDark ? 'text-amber-400' : 'text-amber-600'
+                                        : isDark ? 'text-emerald-400' : 'text-emerald-600'
+                                    }`}
+                                    title={img.excludeWatermark ? 'Reactivar marca de agua en esta foto' : 'Quitar marca de agua y habilitar su descarga directa'}
+                                  >
+                                    {img.excludeWatermark ? 'Reactivar marca' : 'Quitar marca de agua'}
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className={`text-[10px] italic ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                                Galería sin marcas
+                              </span>
+                            )}
+                          </td>
+
                           <td className="px-4 py-3 text-right font-sans">
-                            <button
-                              id={`delete-image-btn-${img.id}`}
-                              onClick={() => {
-                                if (confirm(`¿Eliminar la foto "${img.title}" del servidor?`)) {
-                                  onDeleteImage(img.id);
-                                }
-                              }}
-                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                isDark 
-                                  ? 'text-stone-400 hover:text-rose-400 hover:bg-stone-800' 
-                                  : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
-                              }`}
-                              title="Eliminar foto"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Direct download if photo is exempt or gallery allows download */}
+                              {(img.excludeWatermark || (!parentGal?.watermarkEnabled && parentGal?.allowDownloadHighRes)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => downloadSingleImage(img, 'high-res', {
+                                    watermarkEnabled: parentGal?.watermarkEnabled,
+                                    excludeWatermark: img.excludeWatermark,
+                                    watermarkType: parentGal?.watermarkType,
+                                    watermarkText: parentGal?.watermarkText,
+                                    watermarkImageUrl: parentGal?.watermarkImageUrl,
+                                    watermarkPosition: parentGal?.watermarkPosition,
+                                    watermarkOpacity: parentGal?.watermarkOpacity,
+                                  })}
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                    img.excludeWatermark
+                                      ? 'text-emerald-400 hover:bg-emerald-500/10'
+                                      : isDark ? 'text-stone-400 hover:text-amber-300 hover:bg-stone-800' : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
+                                  }`}
+                                  title="Descargar archivo en alta resolución"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                id={`delete-image-btn-${img.id}`}
+                                onClick={() => {
+                                  if (confirm(`¿Eliminar la foto "${img.title}" del servidor?`)) {
+                                    onDeleteImage(img.id);
+                                  }
+                                }}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                  isDark 
+                                    ? 'text-stone-400 hover:text-rose-400 hover:bg-stone-800' 
+                                    : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                }`}
+                                title="Eliminar foto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
 
                         </tr>
@@ -2307,6 +2373,309 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
+                {/* Section 1: Gallery Specific Permissions */}
+                <div className="sm:col-span-2 space-y-3 pt-2 border-t border-stone-800/60">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] uppercase font-bold tracking-wider block ${
+                      isDark ? 'text-amber-400' : colorTheme.twText
+                    }`}>
+                      Permisos Específicos para esta Galería:
+                    </span>
+                    <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                      Controlan las funciones disponibles para los clientes en esta sesión
+                    </span>
+                  </div>
+
+                  <div className={`space-y-2.5 p-3.5 rounded-2xl border ${
+                    isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {/* Favorites permission */}
+                    <label className={`flex items-center justify-between text-xs cursor-pointer ${
+                      isDark ? 'text-stone-300' : 'text-slate-700'
+                    }`}>
+                      <div className="space-y-0.5">
+                        <span className="font-medium block">Permitir Selección y Envío de Fotos Favoritas</span>
+                        <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                          Habilita el marcado de fotos con corazón y el envío de la selección final.
+                        </span>
+                      </div>
+                      <input
+                        id="toggle-gallery-favorites"
+                        type="checkbox"
+                        checked={galleryAllowFavorites}
+                        onChange={(e) => setGalleryAllowFavorites(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* Feedback permission */}
+                    <label className={`flex items-center justify-between text-xs cursor-pointer ${
+                      isDark ? 'text-stone-300' : 'text-slate-700'
+                    }`}>
+                      <div className="space-y-0.5">
+                        <span className="font-medium block">Permitir Dejar Feedback y Solicitudes de Retoque</span>
+                        <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                          Permite al cliente valorar la sesión y redactar solicitudes de ajuste.
+                        </span>
+                      </div>
+                      <input
+                        id="toggle-gallery-feedback"
+                        type="checkbox"
+                        checked={galleryAllowFeedback}
+                        onChange={(e) => setGalleryAllowFeedback(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* High-res download permission (BLOCKED if watermark is active) */}
+                    <label className={`flex items-center justify-between text-xs ${
+                      galleryWatermarkEnabled ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'
+                    } ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                      <div className="space-y-0.5 pr-2">
+                        <span className="font-medium block">Permitir Descarga Directa de Alta Resolución (RAW/4K)</span>
+                        {galleryWatermarkEnabled ? (
+                          <span className="text-[10px] text-amber-400 font-semibold block">
+                            🔒 Bloqueado: La descarga general de la galería está restringida mientras la marca de agua esté activa. (Las fotos individuales exentas sí permitirán descarga directa).
+                          </span>
+                        ) : (
+                          <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                            Permite la descarga directa de archivos originales en alta calidad.
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        id="toggle-gallery-download"
+                        type="checkbox"
+                        disabled={galleryWatermarkEnabled}
+                        checked={!galleryWatermarkEnabled && galleryAllowDownload}
+                        onChange={(e) => setGalleryAllowDownload(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Section 2: Watermark Protection Settings */}
+                <div className="sm:col-span-2 space-y-3 pt-2 border-t border-stone-800/60">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] uppercase font-bold tracking-wider block ${
+                      isDark ? 'text-violet-400' : 'text-violet-600'
+                    }`}>
+                      Protección y Marca de Agua de la Galería:
+                    </span>
+                    <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                      Aplica protección visual sobre las fotos de esta sesión
+                    </span>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border space-y-4 ${
+                    isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {/* Main Watermark Checkbox */}
+                    <label className="flex items-center justify-between text-xs cursor-pointer select-none">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-violet-400" />
+                          <span className={`font-bold ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                            Activar Marca de Agua en esta Galería
+                          </span>
+                        </div>
+                        <p className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                          Protege las fotografías contra uso no autorizado. Al activarse, la descarga general de la galería se deshabilita automáticamente.
+                        </p>
+                      </div>
+                      <input
+                        id="toggle-gallery-watermark-enabled"
+                        type="checkbox"
+                        checked={galleryWatermarkEnabled}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setGalleryWatermarkEnabled(checked);
+                          if (checked) {
+                            setGalleryAllowDownload(false);
+                          }
+                        }}
+                        className="w-5 h-5 rounded text-violet-500 focus:ring-violet-400 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* Watermark Configuration Options (Visible only when watermark is enabled) */}
+                    {galleryWatermarkEnabled && (
+                      <div className={`space-y-4 pt-4 border-t ${isDark ? 'border-stone-800' : 'border-slate-200'} animate-in fade-in duration-200`}>
+                        
+                        {/* Type Selector: Text vs Image */}
+                        <div className="space-y-1.5">
+                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            Tipo de Marca de Agua:
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              id="watermark-type-text-btn"
+                              onClick={() => setGalleryWatermarkType('text')}
+                              className={`py-2 px-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
+                                galleryWatermarkType === 'text'
+                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
+                                  : isDark ? 'bg-stone-900 text-stone-300 border-stone-800 hover:bg-stone-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              ✍️ Frase o Texto Personalizado
+                            </button>
+                            <button
+                              type="button"
+                              id="watermark-type-image-btn"
+                              onClick={() => setGalleryWatermarkType('image')}
+                              className={`py-2 px-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
+                                galleryWatermarkType === 'image'
+                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
+                                  : isDark ? 'bg-stone-900 text-stone-300 border-stone-800 hover:bg-stone-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              🖼️ Imagen o Logotipo
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Content Input depending on type */}
+                        {galleryWatermarkType === 'text' ? (
+                          <div className="space-y-1">
+                            <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                              Frase o Texto de la Marca de Agua:
+                            </label>
+                            <input
+                              id="input-watermark-text"
+                              type="text"
+                              value={galleryWatermarkText}
+                              onChange={(e) => setGalleryWatermarkText(e.target.value)}
+                              placeholder="Ej. SOMOS PIXART • PROHIBIDA SU REPRODUCCIÓN"
+                              className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                                isDark 
+                                  ? 'bg-stone-900 border-stone-700 text-stone-100 focus:ring-violet-400' 
+                                  : 'bg-white border-slate-300 text-slate-900 focus:ring-violet-500'
+                              }`}
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                              Imagen o Logotipo de la Marca de Agua:
+                            </label>
+                            
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                              {/* Hidden file input */}
+                              <input
+                                ref={watermarkImageInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleWatermarkFileUpload}
+                                className="hidden"
+                              />
+                              <button
+                                type="button"
+                                id="upload-watermark-logo-btn"
+                                onClick={() => watermarkImageInputRef.current?.click()}
+                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Subir Logo desde tu Dispositivo</span>
+                              </button>
+                              
+                              <input
+                                id="input-watermark-image-url"
+                                type="url"
+                                value={galleryWatermarkImageUrl}
+                                onChange={(e) => setGalleryWatermarkImageUrl(e.target.value)}
+                                placeholder="O pega la URL del logo (PNG transparente recomendado)..."
+                                className={`flex-1 w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 ${
+                                  isDark 
+                                    ? 'bg-stone-900 border-stone-700 text-stone-100 focus:ring-violet-400' 
+                                    : 'bg-white border-slate-300 text-slate-900 focus:ring-violet-500'
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Layout / Position: Center vs Repeated */}
+                        <div className="space-y-1.5">
+                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            Disposición de la Marca de Agua:
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                              galleryWatermarkPosition === 'center'
+                                ? 'bg-violet-500/10 border-violet-500 text-violet-300 shadow-xs'
+                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-white border-slate-200 text-slate-700'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="watermarkPosition"
+                                checked={galleryWatermarkPosition === 'center'}
+                                onChange={() => setGalleryWatermarkPosition('center')}
+                                className="text-violet-500 focus:ring-violet-400"
+                              />
+                              <div>
+                                <span className="font-semibold text-xs block">Una sola vez en el centro</span>
+                                <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                                  Sello central destacado con alta visibilidad
+                                </span>
+                              </div>
+                            </label>
+
+                            <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                              galleryWatermarkPosition === 'repeated'
+                                ? 'bg-violet-500/10 border-violet-500 text-violet-300 shadow-xs'
+                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-white border-slate-200 text-slate-700'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="watermarkPosition"
+                                checked={galleryWatermarkPosition === 'repeated'}
+                                onChange={() => setGalleryWatermarkPosition('repeated')}
+                                className="text-violet-500 focus:ring-violet-400"
+                              />
+                              <div>
+                                <span className="font-semibold text-xs block">Repetida por toda la imagen</span>
+                                <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                                  Patrón diagonal en mosaico que cubre toda la toma
+                                </span>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Live Watermark Preview Card */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            Vista Previa de la Protección en Directo:
+                          </label>
+                          <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-700 shadow-inner bg-slate-950 flex items-center justify-center">
+                            <img
+                              src={galleryCover || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80'}
+                              alt="Watermark preview"
+                              className="w-full h-full object-cover filter brightness-90"
+                            />
+                            {/* Watermark overlay component in real-time */}
+                            <WatermarkOverlay
+                              watermarkEnabled={true}
+                              excludeWatermark={false}
+                              watermarkType={galleryWatermarkType}
+                              watermarkText={galleryWatermarkText}
+                              watermarkImageUrl={galleryWatermarkImageUrl}
+                              watermarkPosition={galleryWatermarkPosition}
+                              watermarkOpacity={galleryWatermarkOpacity}
+                            />
+                            <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-sm text-[10px] text-white/90 border border-white/20 font-mono-code z-20">
+                              Muestra en vivo ({galleryWatermarkPosition === 'center' ? 'Centro' : 'Mosaico repetido'})
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
 
               <div className={`flex items-center justify-end gap-3 pt-4 border-t ${
@@ -2523,56 +2892,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     }`}
                   />
                 </div>
-              </div>
-
-              {/* Individual Permission Toggles */}
-              <div className={`space-y-2 p-4 rounded-2xl border ${
-                isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <span className={`text-[10px] uppercase font-bold tracking-wider block mb-1 ${
-                  isDark ? 'text-amber-400' : colorTheme.twText
-                }`}>
-                  Permisos Específicos para este Cliente:
-                </span>
-                
-                <label className={`flex items-center justify-between text-xs cursor-pointer ${
-                  isDark ? 'text-stone-300' : 'text-slate-700'
-                }`}>
-                  <span>Permitir Descarga Directa de Alta Resolución (RAW/4K)</span>
-                  <input
-                    id="toggle-client-download"
-                    type="checkbox"
-                    checked={clientCanDownload}
-                    onChange={(e) => setClientCanDownload(e.target.checked)}
-                    className="rounded text-amber-500 focus:ring-amber-400"
-                  />
-                </label>
-
-                <label className={`flex items-center justify-between text-xs cursor-pointer ${
-                  isDark ? 'text-stone-300' : 'text-slate-700'
-                }`}>
-                  <span>Permitir Selección y Envío de Fotos Favoritas</span>
-                  <input
-                    id="toggle-client-favorites"
-                    type="checkbox"
-                    checked={clientCanFav}
-                    onChange={(e) => setClientCanFav(e.target.checked)}
-                    className="rounded text-amber-500 focus:ring-amber-400"
-                  />
-                </label>
-
-                <label className={`flex items-center justify-between text-xs cursor-pointer ${
-                  isDark ? 'text-stone-300' : 'text-slate-700'
-                }`}>
-                  <span>Permitir Dejar Feedback y Solicitudes de Retoque</span>
-                  <input
-                    id="toggle-client-feedback"
-                    type="checkbox"
-                    checked={clientCanFeedback}
-                    onChange={(e) => setClientCanFeedback(e.target.checked)}
-                    className="rounded text-amber-500 focus:ring-amber-400"
-                  />
-                </label>
               </div>
 
               {/* Assign to Galleries */}

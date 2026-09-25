@@ -141,6 +141,12 @@ export async function seedInitialDataIfEmpty(
           allowDownloadHighRes: g.allowDownloadHighRes ?? true,
           allowFeedback: g.allowFeedback ?? true,
           allowFavoritesSubmission: g.allowFavoritesSubmission ?? true,
+          watermarkEnabled: !!g.watermarkEnabled,
+          watermarkType: g.watermarkType || 'text',
+          watermarkText: g.watermarkText || 'SOMOS PIXART',
+          watermarkImageUrl: g.watermarkImageUrl || '',
+          watermarkPosition: g.watermarkPosition || 'center',
+          watermarkOpacity: g.watermarkOpacity ?? 0.35,
           maxFavoritesSelection: g.maxFavoritesSelection || 45,
           status: g.status,
           viewsCount: g.viewsCount || 0,
@@ -182,6 +188,7 @@ export async function seedInitialDataIfEmpty(
           uploadedAt: img.uploadedAt,
           optimized: img.optimized,
           clientNote: img.clientNote || '',
+          excludeWatermark: !!img.excludeWatermark,
         })
       );
     }
@@ -234,6 +241,12 @@ export async function createGalleryInDb(gallery: GallerySession) {
       allowDownloadHighRes: gallery.allowDownloadHighRes ?? true,
       allowFeedback: gallery.allowFeedback ?? true,
       allowFavoritesSubmission: gallery.allowFavoritesSubmission ?? true,
+      watermarkEnabled: !!gallery.watermarkEnabled,
+      watermarkType: gallery.watermarkType || 'text',
+      watermarkText: gallery.watermarkText || 'SOMOS PIXART',
+      watermarkImageUrl: gallery.watermarkImageUrl || '',
+      watermarkPosition: gallery.watermarkPosition || 'center',
+      watermarkOpacity: gallery.watermarkOpacity ?? 0.35,
       maxFavoritesSelection: gallery.maxFavoritesSelection || 50,
       status: gallery.status,
       viewsCount: gallery.viewsCount || 0,
@@ -268,6 +281,12 @@ export async function updateGalleryInDb(gallery: GallerySession) {
       allowDownloadHighRes: gallery.allowDownloadHighRes,
       allowFeedback: gallery.allowFeedback,
       allowFavoritesSubmission: gallery.allowFavoritesSubmission,
+      watermarkEnabled: !!gallery.watermarkEnabled,
+      watermarkType: gallery.watermarkType || 'text',
+      watermarkText: gallery.watermarkText || 'SOMOS PIXART',
+      watermarkImageUrl: gallery.watermarkImageUrl || '',
+      watermarkPosition: gallery.watermarkPosition || 'center',
+      watermarkOpacity: gallery.watermarkOpacity ?? 0.35,
       maxFavoritesSelection: gallery.maxFavoritesSelection,
       status: gallery.status,
       viewsCount: gallery.viewsCount,
@@ -371,6 +390,7 @@ export async function uploadImageToDb(image: GalleryImage) {
       uploadedAt: image.uploadedAt,
       optimized: image.optimized,
       clientNote: image.clientNote || '',
+      excludeWatermark: !!image.excludeWatermark,
     })
   ]);
 }
@@ -403,6 +423,7 @@ export async function updateImageInDb(image: GalleryImage) {
       uploadedAt: image.uploadedAt,
       optimized: image.optimized,
       clientNote: image.clientNote || '',
+      excludeWatermark: !!image.excludeWatermark,
     })
   ]);
 }

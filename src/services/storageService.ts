@@ -77,15 +77,191 @@ export function calculateServerStats(
   };
 }
 
-// Download single image directly
-export async function downloadSingleImage(image: GalleryImage, type: 'high-res' | 'web-res' = 'high-res') {
+export interface WatermarkDownloadOptions {
+  watermarkEnabled?: boolean;
+  excludeWatermark?: boolean;
+  watermarkType?: 'text' | 'image';
+  watermarkText?: string;
+  watermarkImageUrl?: string;
+  watermarkPosition?: 'center' | 'repeated';
+  watermarkOpacity?: number;
+}
+
+function drawTextWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  text: string,
+  position: 'center' | 'repeated',
+  opacity: number
+) {
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  const fontSize = Math.max(22, Math.round(width * 0.04));
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (position === 'center') {
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-0.25);
+
+    // Dark stroke
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.lineWidth = Math.max(3, fontSize * 0.12);
+    ctx.strokeText(text, 0, 0);
+
+    // White text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, 0, 0);
+
+    const subFontSize = Math.max(11, Math.round(fontSize * 0.35));
+    ctx.font = `bold ${subFontSize}px sans-serif`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillText('PROTEGIDO POR PIXART STUDIOS', 0, fontSize * 0.75);
+
+    ctx.restore();
+  } else {
+    // Repeated diagonal pattern
+    const stepX = Math.max(240, Math.round(width * 0.25));
+    const stepY = Math.max(140, Math.round(height * 0.18));
+    const repFontSize = Math.max(16, Math.round(width * 0.024));
+    ctx.font = `bold ${repFontSize}px sans-serif`;
+
+    const angle = -0.45;
+    for (let x = -width; x < width * 2; x += stepX) {
+      for (let y = -height; y < height * 2; y += stepY) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.lineWidth = Math.max(2, repFontSize * 0.1);
+        ctx.strokeText(text, 0, 0);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+async function renderWatermarkedBlob(
+  imageUrl: string,
+  options: WatermarkDownloadOptions
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context unavailable'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0);
+
+        const opacity = options.watermarkOpacity ?? 0.45;
+        const position = options.watermarkPosition || 'center';
+        const type = options.watermarkType || 'text';
+
+        if (type === 'image' && options.watermarkImageUrl) {
+          const wmImg = new Image();
+          wmImg.crossOrigin = 'anonymous';
+          wmImg.onload = () => {
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            if (position === 'center') {
+              const maxW = canvas.width * 0.45;
+              const maxH = canvas.height * 0.45;
+              const scale = Math.min(maxW / wmImg.width, maxH / wmImg.height);
+              const w = wmImg.width * scale;
+              const h = wmImg.height * scale;
+              const x = (canvas.width - w) / 2;
+              const y = (canvas.height - h) / 2;
+              ctx.drawImage(wmImg, x, y, w, h);
+            } else {
+              const patternCanvas = document.createElement('canvas');
+              const patternSize = Math.max(160, Math.round(canvas.width * 0.15));
+              const aspect = wmImg.height / wmImg.width || 1;
+              patternCanvas.width = patternSize;
+              patternCanvas.height = patternSize * aspect + 60;
+              const pCtx = patternCanvas.getContext('2d');
+              if (pCtx) {
+                pCtx.drawImage(wmImg, 20, 20, patternSize - 40, (patternSize - 40) * aspect);
+                const pattern = ctx.createPattern(patternCanvas, 'repeat');
+                if (pattern) {
+                  ctx.fillStyle = pattern;
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+              }
+            }
+            ctx.restore();
+            canvas.toBlob((blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Canvas toBlob failed'));
+            }, 'image/jpeg', 0.95);
+          };
+          wmImg.onerror = () => {
+            drawTextWatermark(ctx, canvas.width, canvas.height, options.watermarkText || 'SOMOS PIXART', position, opacity);
+            canvas.toBlob((blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Canvas toBlob failed'));
+            }, 'image/jpeg', 0.95);
+          };
+          wmImg.src = options.watermarkImageUrl;
+        } else {
+          const text = (options.watermarkText || 'SOMOS PIXART').trim();
+          drawTextWatermark(ctx, canvas.width, canvas.height, text, position, opacity);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob failed'));
+          }, 'image/jpeg', 0.95);
+        }
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = (e) => reject(e);
+    img.src = imageUrl;
+  });
+}
+
+// Download single image directly (burns watermark if enabled and not exempt)
+export async function downloadSingleImage(
+  image: GalleryImage,
+  type: 'high-res' | 'web-res' = 'high-res',
+  watermarkOptions?: WatermarkDownloadOptions
+) {
   try {
     const targetUrl = type === 'high-res' ? image.highResUrl || image.url : image.url;
+    const isWatermarkOn = !!watermarkOptions?.watermarkEnabled && !image.excludeWatermark && !watermarkOptions?.excludeWatermark;
     
-    // Fetch blob
-    const response = await fetch(targetUrl);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
+    let blobUrl: string;
+
+    if (isWatermarkOn) {
+      try {
+        const watermarkedBlob = await renderWatermarkedBlob(targetUrl, watermarkOptions);
+        blobUrl = URL.createObjectURL(watermarkedBlob);
+      } catch (wmError) {
+        console.warn('Canvas watermarking fell back to direct fetch', wmError);
+        const response = await fetch(targetUrl);
+        const blob = await response.blob();
+        blobUrl = URL.createObjectURL(blob);
+      }
+    } else {
+      const response = await fetch(targetUrl);
+      const blob = await response.blob();
+      blobUrl = URL.createObjectURL(blob);
+    }
     
     const link = document.createElement('a');
     link.href = blobUrl;

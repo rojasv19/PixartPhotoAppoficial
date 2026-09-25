@@ -11,6 +11,7 @@ import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../servic
 import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { PhotoLightbox } from './PhotoLightbox';
 import { BatchDownloadModal } from './BatchDownloadModal';
+import { WatermarkOverlay } from './WatermarkOverlay';
 
 interface GalleryViewProps {
   gallery: GallerySession;
@@ -20,6 +21,7 @@ interface GalleryViewProps {
   onToggleFavorite: (imageId: string) => void;
   onAddFeedback: (galleryId: string, feedback: Omit<FeedbackItem, 'id' | 'createdAt'>) => void;
   onUpdateGallery?: (updatedGallery: GallerySession) => void;
+  onUpdateImage?: (updatedImage: GalleryImage) => void;
   onRequestLogin: () => void;
   theme?: 'light' | 'dark';
   branding?: StudioBrandingConfig;
@@ -32,6 +34,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onBack,
   onToggleFavorite,
   onAddFeedback,
+  onUpdateGallery,
+  onUpdateImage,
   onRequestLogin,
   theme = 'dark',
   branding,
@@ -100,9 +104,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return galleryImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
   }, [galleryImages]);
 
-  const canDownload = currentUser ? (currentUser.canDownloadHighRes ?? gallery.allowDownloadHighRes) : gallery.allowDownloadHighRes;
-  const canFavorite = currentUser ? (currentUser.canSelectFavorites ?? gallery.allowFavoritesSubmission) : true;
-  const canFeedback = currentUser ? (currentUser.canLeaveFeedback ?? gallery.allowFeedback) : true;
+  // Permissions are now strictly controlled by the gallery configuration
+  const isWatermarkActive = !!gallery.watermarkEnabled;
+  const canDownloadGeneral = !isWatermarkActive && (gallery.allowDownloadHighRes ?? true);
+  const canFavorite = gallery.allowFavoritesSubmission ?? true;
+  const canFeedback = gallery.allowFeedback ?? true;
+  const canDownload = canDownloadGeneral;
 
   // Effective personalized max favorites limit
   const effectiveMaxFavorites = useMemo(() => {
@@ -546,12 +553,23 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     loading="lazy"
                   />
+
+                  {/* Watermark Protection Overlay */}
+                  <WatermarkOverlay
+                    watermarkEnabled={gallery.watermarkEnabled}
+                    excludeWatermark={image.excludeWatermark}
+                    watermarkType={gallery.watermarkType}
+                    watermarkText={gallery.watermarkText}
+                    watermarkImageUrl={gallery.watermarkImageUrl}
+                    watermarkPosition={gallery.watermarkPosition}
+                    watermarkOpacity={gallery.watermarkOpacity}
+                  />
                   
                   {/* Subtle Gradient overlay on hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
                   
                   {/* Click to open indicator */}
-                  <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-3">
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-3 pointer-events-none">
                     <span className="px-3.5 py-1.5 rounded-full bg-slate-950/85 backdrop-blur-md text-white text-xs font-medium border border-slate-700/60 shadow-lg flex items-center gap-1.5 hover:scale-105 transition-transform">
                       <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
                       <span>Pantalla Completa</span>
@@ -559,7 +577,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   </div>
 
                   {/* Top Badges: File Size & High-res indicator */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 z-20">
                     <span className="px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[10px] font-mono-code text-blue-300 border border-blue-500/30">
                       {formatBytes(image.fileSizeBytes)}
                     </span>
@@ -576,7 +594,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                         e.stopPropagation();
                         onToggleFavorite(image.id);
                       }}
-                      className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-md transition-all shadow-lg cursor-pointer ${
+                      className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-md transition-all shadow-lg cursor-pointer z-20 ${
                         isFav
                           ? 'bg-rose-600 text-white scale-110 shadow-rose-600/30'
                           : 'bg-slate-950/70 text-slate-300 hover:text-rose-400 hover:bg-slate-900 border border-slate-700/60'
@@ -592,7 +610,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <div className={`p-4 flex items-center justify-between gap-3 border-t transition-colors ${
                   isDark ? 'bg-[#181A1D] border-slate-800' : 'bg-white border-slate-100'
                 }`}>
-                  <div className="truncate">
+                  <div className="truncate flex-1">
                     <h4 className={`text-xs sm:text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
                       {image.title}
                     </h4>
@@ -601,19 +619,60 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     </p>
                   </div>
 
-                  {/* Direct Download Icon */}
-                  {canDownload && (
-                    <button
-                      id={`direct-download-img-${image.id}`}
-                      onClick={() => downloadSingleImage(image, 'high-res')}
-                      className={`p-2 rounded-xl border transition-colors flex-shrink-0 cursor-pointer ${
-                        isDark ? 'bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-blue-400 border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 border-slate-200'
-                      }`}
-                      title="Descargar archivo en alta resolución"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* Action buttons: Admin Watermark Toggle & Download Button */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Admin Watermark Exemption Button */}
+                    {currentUser?.role === 'admin' && gallery.watermarkEnabled && onUpdateImage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdateImage({ ...image, excludeWatermark: !image.excludeWatermark });
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-[10px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                          image.excludeWatermark
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-violet-500/20 text-violet-300 border-violet-500/40 hover:bg-violet-500/30'
+                        }`}
+                        title={image.excludeWatermark ? 'Reactivar marca de agua en esta foto' : 'Quitar marca de agua y habilitar su descarga directa'}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span className="hidden sm:inline">
+                          {image.excludeWatermark ? '✓ Sin Marca (Descargable)' : 'Quitar Marca'}
+                        </span>
+                        <span className="sm:hidden">
+                          {image.excludeWatermark ? 'Sin Marca' : 'Quitar'}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Direct Download Icon: Shown automatically if photo is exempt from watermark OR if gallery allows download */}
+                    {(image.excludeWatermark || (!gallery.watermarkEnabled && canDownloadGeneral) || (currentUser?.role === 'admin')) && (
+                      <button
+                        id={`direct-download-img-${image.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadSingleImage(image, 'high-res', {
+                            watermarkEnabled: gallery.watermarkEnabled,
+                            excludeWatermark: image.excludeWatermark,
+                            watermarkType: gallery.watermarkType,
+                            watermarkText: gallery.watermarkText,
+                            watermarkImageUrl: gallery.watermarkImageUrl,
+                            watermarkPosition: gallery.watermarkPosition,
+                            watermarkOpacity: gallery.watermarkOpacity,
+                          });
+                        }}
+                        className={`p-2 rounded-xl border transition-colors flex-shrink-0 cursor-pointer ${
+                          image.excludeWatermark
+                            ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40'
+                            : isDark ? 'bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-blue-400 border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 border-slate-200'
+                        }`}
+                        title={image.excludeWatermark ? 'Descargar foto sin marca de agua (Descarga autorizada)' : 'Descargar archivo en alta resolución'}
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

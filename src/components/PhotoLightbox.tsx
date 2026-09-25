@@ -3,9 +3,10 @@ import {
   X, ChevronLeft, ChevronRight, Heart, Download, Camera, Sliders, 
   Maximize2, Minimize2, ZoomIn, ZoomOut, Info, Sparkles, Check, HardDrive
 } from 'lucide-react';
-import { GalleryImage, User, StudioBrandingConfig } from '../types';
+import { GalleryImage, GallerySession, User, StudioBrandingConfig } from '../types';
 import { formatBytes, downloadSingleImage } from '../services/storageService';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
+import { WatermarkOverlay } from './WatermarkOverlay';
 
 interface PhotoLightboxProps {
   image: GalleryImage | null;
@@ -17,6 +18,8 @@ interface PhotoLightboxProps {
   onSelectImage: (image: GalleryImage) => void;
   onToggleFavorite: (imageId: string) => void;
   branding?: StudioBrandingConfig;
+  gallery?: GallerySession;
+  onUpdateImage?: (updatedImage: GalleryImage) => void;
 }
 
 export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
@@ -29,6 +32,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   onSelectImage,
   onToggleFavorite,
   branding,
+  gallery,
+  onUpdateImage,
 }) => {
   const [showExif, setShowExif] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -119,7 +124,15 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
 
   const handleDownload = async (type: 'high-res' | 'web-res') => {
     setDownloadingType(type);
-    await downloadSingleImage(image, type);
+    await downloadSingleImage(image, type, {
+      watermarkEnabled: gallery?.watermarkEnabled,
+      excludeWatermark: image.excludeWatermark,
+      watermarkType: gallery?.watermarkType,
+      watermarkText: gallery?.watermarkText,
+      watermarkImageUrl: gallery?.watermarkImageUrl,
+      watermarkPosition: gallery?.watermarkPosition,
+      watermarkOpacity: gallery?.watermarkOpacity,
+    });
     setDownloadingType(null);
     setDownloadSuccess(true);
     setTimeout(() => setDownloadSuccess(false), 3000);
@@ -223,14 +236,19 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             </button>
           )}
 
-          {/* Download Button */}
-          {canDownload && (
+          {/* Download Button: Automatically enabled if photo is exempt from watermark OR if gallery allows download */}
+          {((image.excludeWatermark) || (!gallery?.watermarkEnabled && canDownload) || (currentUser?.role === 'admin')) && (
             <div className="relative group">
               <button
                 id="lightbox-download-highres-btn"
                 onClick={() => handleDownload('high-res')}
                 disabled={downloadingType !== null}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50 cursor-pointer ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50 cursor-pointer ${
+                  image.excludeWatermark 
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30' 
+                    : `${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`
+                }`}
+                title={image.excludeWatermark ? "Foto sin marca de agua: Descarga autorizada" : "Descargar archivo RAW en alta resolución"}
               >
                 {downloadSuccess ? (
                   <>
@@ -240,12 +258,37 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">Descargar RAW</span>
+                    <span className="hidden sm:inline">
+                      {image.excludeWatermark ? 'Descargar RAW (Sin Marca)' : 'Descargar RAW'}
+                    </span>
                     <span className="sm:hidden">Descargar</span>
                   </>
                 )}
               </button>
             </div>
+          )}
+
+          {/* Admin Watermark Exemption Toggle */}
+          {currentUser?.role === 'admin' && gallery?.watermarkEnabled && onUpdateImage && (
+            <button
+              id="lightbox-admin-watermark-toggle-btn"
+              type="button"
+              onClick={() => onUpdateImage({ ...image, excludeWatermark: !image.excludeWatermark })}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                image.excludeWatermark
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                  : 'bg-violet-500/20 text-violet-300 border-violet-500/40 hover:bg-violet-500/30'
+              }`}
+              title={image.excludeWatermark ? "Foto exenta de marca. Clic para reactivar marca de agua." : "Quitar marca de agua de esta foto y habilitar su descarga"}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {image.excludeWatermark ? '✓ Sin Marca (Descargable)' : 'Quitar Marca de Agua'}
+              </span>
+              <span className="sm:hidden">
+                {image.excludeWatermark ? 'Sin Marca' : 'Quitar Marca'}
+              </span>
+            </button>
           )}
 
           {/* Close button */}
@@ -288,8 +331,22 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 isFullscreen || isImmersive ? 'max-h-[88vh] max-w-[96vw]' : 'max-h-[75vh] max-w-full'
               } object-contain rounded-lg shadow-2xl border border-slate-800 transition-all`}
             />
+
+            {/* Watermark Overlay in Lightbox */}
+            {gallery?.watermarkEnabled && (
+              <WatermarkOverlay
+                watermarkEnabled={gallery.watermarkEnabled}
+                excludeWatermark={image.excludeWatermark}
+                watermarkType={gallery.watermarkType}
+                watermarkText={gallery.watermarkText}
+                watermarkImageUrl={gallery.watermarkImageUrl}
+                watermarkPosition={gallery.watermarkPosition}
+                watermarkOpacity={gallery.watermarkOpacity}
+              />
+            )}
+
             {isFavorite && (
-              <div className="absolute top-4 right-4 bg-rose-600/90 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
+              <div className="absolute top-4 right-4 bg-rose-600/90 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-sm z-20">
                 <Heart className="w-3.5 h-3.5 fill-current" />
                 <span>Foto Seleccionada</span>
               </div>
