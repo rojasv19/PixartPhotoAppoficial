@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para agregar la opción de eliminar fotos de una en una dentro de la galería y la opción de eliminar todas las imágenes de una galería en lote con modal de confirmación.",
-  "updatedAt":  "2026-09-25T20:12:35.187911196Z",
+  "summary":  "Plan integral para implementar el catálogo dinámico de Google Fonts con carga en tiempo real, inspector flotante/barra de formato de tipografía (fuente, tamaño, color, grosor, espaciado) en todos los textos editables, y solución al problema de sincronización multidispositivo mediante InstantDB en la nube.",
+  "updatedAt":  "2026-09-25T22:23:57.588258692Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

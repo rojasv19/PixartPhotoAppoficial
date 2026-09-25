@@ -47,8 +47,10 @@ import {
   replyFeedbackInDb,
   batchOptimizeImagesInDb,
   addAuditLogInDb,
-  syncAdminUsersToDb
+  syncAdminUsersToDb,
+  saveBrandingToDb
 } from './services/instantDbService';
+import { preloadFonts, typographyToStyle } from './services/googleFontsService';
 
 export default function App() {
   // Query InstantDB in real-time

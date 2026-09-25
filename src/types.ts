@@ -64,6 +64,19 @@ export interface GalleryImage {
   excludeWatermark?: boolean; // If true, watermark is removed from this photo and direct download is enabled
 }
 
+export interface TypographyStyle {
+  fontFamily?: string;
+  fontSize?: string; // e.g. '18px', '1.25rem'
+  fontWeight?: string; // '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  color?: string; // Hex, rgb, or class
+  letterSpacing?: string; // e.g. '-0.025em', '0.05em', '0.1em'
+  lineHeight?: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline';
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+}
+
 export interface GallerySession {
   id: string;
   title: string;
@@ -97,6 +110,9 @@ export interface GallerySession {
   createdAt: string;
   lastActivityAt: string;
   feedbackList: FeedbackItem[];
+  titleTypography?: TypographyStyle;
+  subtitleTypography?: TypographyStyle;
+  descriptionTypography?: TypographyStyle;
 }
 
 export interface AuditLogItem {
@@ -305,6 +321,17 @@ export interface StudioBrandingConfig {
 
   // Modals & Popups Text Customization
   modalTexts?: ModalTextsConfig;
+
+  // Global & Individual Typography Styles
+  studioNameTypography?: TypographyStyle;
+  taglineTypography?: TypographyStyle;
+  headingTypography?: TypographyStyle;
+  bodyTypography?: TypographyStyle;
+  portalHeroTitleTypography?: TypographyStyle;
+  portalHeroSubtitleTypography?: TypographyStyle;
+  watermarkTypography?: TypographyStyle;
+  footerTypography?: TypographyStyle;
+  customTypographyMap?: Record<string, TypographyStyle>;
 }
 
 export type RetouchStatus = 'pending' | 'in_progress' | 'completed' | 'delivered';

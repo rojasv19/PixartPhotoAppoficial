@@ -1,5 +1,5 @@
 import { db, tx, id, APP_ID } from '../lib/instant';
-import { GalleryImage, GallerySession, User, AuditLogItem, FeedbackItem } from '../types';
+import { GalleryImage, GallerySession, User, AuditLogItem, FeedbackItem, StudioBrandingConfig } from '../types';
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS } from '../data/initialData';
 
 export { APP_ID, db, id };
@@ -528,3 +528,17 @@ export async function addAuditLogInDb(log: AuditLogItem) {
     })
   ]);
 }
+
+export const BRANDING_SETTING_ID = '00000000-0000-4000-a000-000000000001';
+
+export async function saveBrandingToDb(branding: StudioBrandingConfig) {
+  const configJson = JSON.stringify(branding);
+  return db.transact([
+    tx.studioSettings[BRANDING_SETTING_ID].update({
+      key: 'studio_branding',
+      configJson,
+      updatedAt: new Date().toISOString(),
+    })
+  ]);
+}
+

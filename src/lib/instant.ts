@@ -87,6 +87,11 @@ const _schema = i.schema({
       galleryTitle: i.string().optional(),
       iconType: i.string().optional(),
     }),
+    studioSettings: i.entity({
+      key: i.string(),
+      configJson: i.string(),
+      updatedAt: i.string(),
+    }),
   },
 });
 
