@@ -214,13 +214,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Upload Form Simulation State
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadTags, setUploadTags] = useState('RAW, Alta Resolución, Editorial');
-  const [uploadFileSizeMb, setUploadFileSizeMb] = useState<number>(24.5);
-  const [uploadWidth, setUploadWidth] = useState<number>(6720);
-  const [uploadHeight, setUploadHeight] = useState<number>(4480);
-  const [uploadImageUrl, setUploadImageUrl] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85');
+  // Multiple Real File Upload State
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<Array<{
+    id: string;
+    name: string;
+    title: string;
+    fileSizeBytes: number;
+    sizeFormatted: string;
+    previewUrl: string;
+    width: number;
+    height: number;
+  }>>([]);
+  const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
+  const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
 
   // Storage Stats Summary
   const usedPercentage = Math.min(100, (storageStats.usedBytes / storageStats.totalCapacityBytes) * 100);
@@ -416,51 +422,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setShowNewClientModal(true);
   };
 
-  // Submit Image Upload
+  // Process Multiple Files For Upload
+  const processFilesForUpload = (files: FileList | File[]) => {
+    const fileList = Array.from(files).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|tiff?|cr3|arw|nef|raw|dng)$/i.test(f.name));
+    if (fileList.length === 0) return;
+
+    setIsProcessingUploads(true);
+    let loadedCount = 0;
+
+    fileList.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const previewUrl = (event.target?.result as string) || '';
+        const img = new Image();
+        img.onload = () => {
+          const width = img.naturalWidth || img.width || 4000;
+          const height = img.naturalHeight || img.height || 3000;
+          const originalName = file.name;
+          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+          setPendingUploadFiles(prev => [
+            ...prev,
+            {
+              id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              name: originalName,
+              title: title || 'Fotografía',
+              fileSizeBytes: file.size,
+              sizeFormatted: formatBytes(file.size),
+              previewUrl,
+              width,
+              height,
+            }
+          ]);
+
+          loadedCount++;
+          if (loadedCount >= fileList.length) {
+            setIsProcessingUploads(false);
+          }
+        };
+
+        img.onerror = () => {
+          const originalName = file.name;
+          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+          setPendingUploadFiles(prev => [
+            ...prev,
+            {
+              id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              name: originalName,
+              title: title || 'Fotografía',
+              fileSizeBytes: file.size,
+              sizeFormatted: formatBytes(file.size),
+              previewUrl: previewUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85',
+              width: 6000,
+              height: 4000,
+            }
+          ]);
+
+          loadedCount++;
+          if (loadedCount >= fileList.length) {
+            setIsProcessingUploads(false);
+          }
+        };
+
+        img.src = previewUrl;
+      };
+
+      reader.onerror = () => {
+        loadedCount++;
+        if (loadedCount >= fileList.length) {
+          setIsProcessingUploads(false);
+        }
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemovePendingFile = (id: string) => {
+    setPendingUploadFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const handleClearPendingFiles = () => {
+    setPendingUploadFiles([]);
+  };
+
+  // Submit Multiple Real Images Upload
   const handleUploadImageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadGalleryId || !uploadTitle.trim()) return;
+    if (!uploadGalleryId || pendingUploadFiles.length === 0) return;
 
-    const fileSizeBytes = Math.round(uploadFileSizeMb * 1024 * 1024);
-    const tagsArray = uploadTags.split(',').map(t => t.trim()).filter(Boolean);
-
-    onUploadImage(uploadGalleryId, {
-      title: uploadTitle,
-      url: uploadImageUrl,
-      highResUrl: uploadImageUrl,
-      originalFileName: `LUM_${Math.floor(1000 + Math.random() * 9000)}_RAW.CR3`,
-      fileSizeBytes,
-      width: uploadWidth,
-      height: uploadHeight,
-      tags: tagsArray,
+    pendingUploadFiles.forEach(item => {
+      onUploadImage(uploadGalleryId, {
+        title: item.title,
+        url: item.previewUrl,
+        highResUrl: item.previewUrl,
+        originalFileName: item.name,
+        fileSizeBytes: item.fileSizeBytes,
+        width: item.width,
+        height: item.height,
+        tags: ['RAW', 'Alta Resolución'],
+      });
     });
 
     setUploadGalleryId(null);
-    setUploadTitle('');
-  };
-
-  // Handle Real File Selection for Upload
-  const handleRealFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadTitle(file.name.replace(/\.[^/.]+$/, ''));
-    setUploadFileSizeMb(parseFloat((file.size / (1024 * 1024)).toFixed(2)));
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setUploadImageUrl(event.target.result as string);
-        // compute dimensions
-        const img = new Image();
-        img.onload = () => {
-          setUploadWidth(img.width || 4000);
-          setUploadHeight(img.height || 3000);
-        };
-        img.src = event.target.result as string;
-      }
-    };
-    reader.readAsDataURL(file);
+    setPendingUploadFiles([]);
   };
 
   // Submit Feedback Reply
@@ -1255,7 +1321,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 id={`upload-photo-to-gal-btn-${gal.id}`}
                                 onClick={() => {
                                   setUploadGalleryId(gal.id);
-                                  setUploadTitle(`Foto ${gal.title.split(' ')[0]}`);
+                                  setPendingUploadFiles([]);
                                 }}
                                 title="Subir Fotografías a esta Sesión"
                                 className={`p-2 rounded-lg border transition-colors cursor-pointer ${
@@ -2951,15 +3017,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* MODAL: UPLOAD IMAGES TO GALLERY */}
+      {/* MODAL: UPLOAD IMAGES TO GALLERY (MULTI-FILE & REAL METADATA) */}
       {uploadGalleryId && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverUpload(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverUpload(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverUpload(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              processFilesForUpload(e.dataTransfer.files);
+            }
+          }}
+        >
           <div 
             id="upload-image-modal-dialog"
-            className={`w-full max-w-lg border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 ${
+            className={`w-full max-w-2xl border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 transition-all ${
               isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-slate-200'
             }`}
           >
+            {/* Modal Header */}
             <div className={`flex items-center justify-between border-b pb-4 ${
               isDark ? 'border-stone-800' : 'border-slate-100'
             }`}>
@@ -2967,169 +3054,232 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <h3 className={`text-xl font-bold font-serif-display ${
                   isDark ? 'text-stone-100' : 'text-slate-900'
                 }`}>
-                  {uploadModalTexts.title || 'Carga de Fotografías de Alta Resolución'}
+                  Subir Fotografías a la Galería
                 </h3>
                 <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                  {uploadModalTexts.subtitle || 'Sube archivos con cálculo automático de tamaño y dimensiones.'}
+                  Sesión: <strong className={isDark ? 'text-amber-400' : colorTheme.twText}>
+                    {galleries.find(g => g.id === uploadGalleryId)?.title || 'Galería Seleccionada'}
+                  </strong> • Los metadatos de peso, nombre y resolución se detectan automáticamente.
                 </p>
               </div>
               <button 
                 id="close-upload-modal-btn"
-                onClick={() => setUploadGalleryId(null)}
+                onClick={() => {
+                  setUploadGalleryId(null);
+                  setPendingUploadFiles([]);
+                }}
                 className={`p-2 rounded-xl transition-colors cursor-pointer ${
                   isDark ? 'text-stone-400 hover:text-stone-100 hover:bg-stone-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                 }`}
+                title="Cerrar modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUploadImageSubmit} className="space-y-4">
+            <form onSubmit={handleUploadImageSubmit} className="space-y-5">
               
-              {/* File upload drag area */}
-              <div className={`border-2 border-dashed rounded-2xl p-5 text-center relative group transition-colors ${
-                isDark 
-                  ? 'border-stone-700 hover:border-amber-400 bg-stone-950/50' 
-                  : 'border-slate-300 hover:border-slate-500 bg-slate-50/50'
-              }`}>
+              {/* File upload drag-and-drop area */}
+              <div 
+                className={`border-2 border-dashed rounded-2xl p-6 text-center relative group transition-all cursor-pointer ${
+                  isDragOverUpload
+                    ? 'border-amber-400 bg-amber-500/10 scale-[1.01]'
+                    : isDark 
+                      ? 'border-stone-700 hover:border-amber-400/80 bg-stone-950/60' 
+                      : 'border-slate-300 hover:border-blue-500 bg-slate-50/70'
+                }`}
+                onClick={() => photoUploadInputRef.current?.click()}
+              >
                 <input
                   ref={photoUploadInputRef}
                   type="file"
-                  accept="image/*"
-                  onChange={handleRealFileSelect}
+                  multiple
+                  accept="image/*,.cr3,.arw,.nef,.raw,.dng,.tiff,.tif"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      processFilesForUpload(e.target.files);
+                      e.target.value = '';
+                    }
+                  }}
                   className="hidden"
                 />
                 
-                {uploadImageUrl ? (
-                  <div className="space-y-3">
-                    <div className="relative mx-auto w-full max-w-[200px] h-32 rounded-xl overflow-hidden border border-slate-700 shadow-md bg-black">
-                      <img 
-                        src={uploadImageUrl} 
-                        alt="Preview upload" 
-                        className="w-full h-full object-cover" 
-                      />
-                    </div>
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => photoUploadInputRef.current?.click()}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-bold shadow-md cursor-pointer transition-all ${colorTheme.twBg} ${colorTheme.twBgHover}`}
-                      >
-                        <Upload className="w-4 h-4" />
-                        <span>Seleccionar otra foto desde tu dispositivo</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div 
-                    onClick={() => photoUploadInputRef.current?.click()}
-                    className="cursor-pointer py-3"
-                  >
-                    <Upload className={`w-8 h-8 mx-auto mb-2 group-hover:scale-110 transition-transform ${
-                      isDark ? 'text-amber-400' : colorTheme.twText
-                    }`} />
-                    <p className={`text-xs font-semibold ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
-                      Haz clic para seleccionar o arrastra una fotografía desde tu equipo
-                    </p>
-                    <button
-                      type="button"
-                      className={`mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-bold shadow-md cursor-pointer ${colorTheme.twBg}`}
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>Subir Fotografía desde tu Dispositivo</span>
-                    </button>
-                  </div>
-                )}
+                <Upload className={`w-10 h-10 mx-auto mb-3 transition-transform group-hover:scale-110 ${
+                  isDragOverUpload 
+                    ? 'text-amber-400 animate-bounce' 
+                    : isDark ? 'text-amber-400' : colorTheme.twText
+                }`} />
                 
-                <p className={`text-[11px] mt-2 ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
-                  Formatos compatibles: RAW, CR3, ARW, NEF, TIFF, JPEG de alta resolución
+                <p className={`text-sm font-bold ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                  {isDragOverUpload ? '¡Suelta tus fotografías aquí!' : 'Arrastra y suelta tus fotografías aquí o haz clic para seleccionarlas'}
+                </p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  Puedes seleccionar varias fotografías al mismo tiempo.
+                </p>
+
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      photoUploadInputRef.current?.click();
+                    }}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-md cursor-pointer transition-all ${colorTheme.twBg} ${colorTheme.twBgHover}`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Seleccionar fotos desde tu dispositivo</span>
+                  </button>
+                </div>
+                
+                <p className={`text-[11px] mt-3 ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                  Formatos compatibles: RAW, CR3, ARW, NEF, TIFF, PNG, JPEG de alta resolución
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                  {uploadModalTexts.titleLabel || 'Título de la Fotografía:'}
-                </label>
-                <input
-                  id="input-upload-title"
-                  type="text"
-                  required
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder={uploadModalTexts.titlePlaceholder || 'Ej. Retrato al Atardecer'}
-                  className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                    isDark 
-                      ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
-                      : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
-                  }`}
-                />
-              </div>
+              {/* Real Metadata Inspector & Queue of Selected Photos */}
+              {pendingUploadFiles.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                        Fotografías Listas para Subir ({pendingUploadFiles.length})
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                        isDark ? 'bg-stone-800 text-stone-300 border border-stone-700' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>
+                        Total: {formatBytes(pendingUploadFiles.reduce((acc, f) => acc + f.fileSizeBytes, 0))}
+                      </span>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {uploadModalTexts.filesizeLabel || 'Tamaño RAW en MB:'}
-                  </label>
-                  <input
-                    id="input-upload-filesize"
-                    type="number"
-                    step="0.1"
-                    value={uploadFileSizeMb}
-                    onChange={(e) => setUploadFileSizeMb(parseFloat(e.target.value))}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleClearPendingFiles}
+                      className="text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                    >
+                      Limpiar todo
+                    </button>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {uploadModalTexts.resolutionLabel || 'Resolución (px):'}
-                  </label>
-                  <div className="flex gap-1 text-xs font-mono-code">
-                    <input
-                      type="number"
-                      value={uploadWidth}
-                      onChange={(e) => setUploadWidth(parseInt(e.target.value))}
-                      className={`w-1/2 border rounded-xl px-2 py-2 ${
-                        isDark ? 'bg-stone-950 border-stone-700 text-stone-100' : 'bg-white border-slate-300 text-slate-900'
-                      }`}
-                    />
-                    <span className={`self-center ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>×</span>
-                    <input
-                      type="number"
-                      value={uploadHeight}
-                      onChange={(e) => setUploadHeight(parseInt(e.target.value))}
-                      className={`w-1/2 border rounded-xl px-2 py-2 ${
-                        isDark ? 'bg-stone-950 border-stone-700 text-stone-100' : 'bg-white border-slate-300 text-slate-900'
-                      }`}
-                    />
+                  {/* Scrollable list of pending photos with actual metadata */}
+                  <div className={`max-h-72 overflow-y-auto space-y-2 pr-1 rounded-2xl p-2 border ${
+                    isDark ? 'bg-stone-950/70 border-stone-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    {pendingUploadFiles.map((item, idx) => (
+                      <div 
+                        key={item.id}
+                        className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-colors ${
+                          isDark ? 'bg-stone-900 border-stone-800 hover:border-stone-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Thumbnail & Filename */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-stone-700/60 bg-black">
+                            <img 
+                              src={item.previewUrl} 
+                              alt={item.name} 
+                              className="w-full h-full object-cover" 
+                            />
+                            <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[9px] text-center text-stone-300 truncate px-0.5">
+                              #{idx + 1}
+                            </span>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className={`font-mono text-xs font-bold truncate ${isDark ? 'text-stone-100' : 'text-slate-900'}`} title={item.name}>
+                              {item.name}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {/* Real Weight Badge */}
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                                isDark ? 'bg-stone-800/80 text-amber-300 border-amber-500/20' : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}>
+                                <HardDrive className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span>{item.sizeFormatted}</span>
+                              </span>
+
+                              {/* Real Resolution Badge */}
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                                isDark ? 'bg-stone-800/80 text-blue-300 border-blue-500/20' : 'bg-blue-50 text-blue-800 border-blue-200'
+                              }`}>
+                                <Camera className="w-3 h-3 text-blue-400 shrink-0" />
+                                <span>{item.width} × {item.height} px</span>
+                              </span>
+
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400">
+                                {item.name.split('.').pop() || 'IMG'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Remove from queue button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePendingFile(item.id)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                            isDark ? 'text-stone-400 hover:text-rose-300 hover:bg-rose-500/20' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                          }`}
+                          title="Quitar de la lista"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className={`flex items-center justify-end gap-3 pt-4 border-t ${
+              {/* Processing indicator */}
+              {isProcessingUploads && (
+                <div className="flex items-center justify-center gap-2 text-xs text-amber-400 py-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Procesando y calculando resolución de las fotografías...</span>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t ${
                 isDark ? 'border-stone-800' : 'border-slate-100'
               }`}>
-                <button
-                  type="button"
-                  id="cancel-upload-btn"
-                  onClick={() => setUploadGalleryId(null)}
-                  className={`px-4 py-2 rounded-xl text-xs cursor-pointer ${
-                    isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  id="submit-upload-btn"
-                  className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
-                >
-                  {uploadModalTexts.saveButtonText || 'Subir Fotografía al Servidor'}
-                </button>
+                <div className="text-xs text-stone-400">
+                  {pendingUploadFiles.length > 0 ? (
+                    <span>
+                      {pendingUploadFiles.length} {pendingUploadFiles.length === 1 ? 'fotografía seleccionada' : 'fotografías seleccionadas'}
+                    </span>
+                  ) : (
+                    <span>Selecciona al menos una foto para comenzar</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    id="cancel-upload-btn"
+                    onClick={() => {
+                      setUploadGalleryId(null);
+                      setPendingUploadFiles([]);
+                    }}
+                    className={`px-4 py-2.5 rounded-xl text-xs cursor-pointer ${
+                      isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    id="submit-upload-btn"
+                    disabled={pendingUploadFiles.length === 0 || isProcessingUploads}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
+                  >
+                    {pendingUploadFiles.length === 0
+                      ? 'Selecciona Fotografías'
+                      : pendingUploadFiles.length === 1
+                        ? `Subir 1 Fotografía al Servidor (${formatBytes(pendingUploadFiles[0].fileSizeBytes)})`
+                        : `Subir ${pendingUploadFiles.length} Fotografías al Servidor (${formatBytes(pendingUploadFiles.reduce((acc, f) => acc + f.fileSizeBytes, 0))})`
+                    }
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para filtrar favoritas mostrando solo fotos pendientes por defecto, botón de marcar todas como listas con ventana de confirmación, pestaña de completadas y opciones para limpiar completadas masivamente o una por una.",
-  "updatedAt":  "2026-09-25T18:21:14.459300978Z",
+  "summary":  "Plan para renovar el modal de carga de imágenes: eliminar campos manuales de título, tamaño y resolución, extraer automáticamente los metadatos reales de cada archivo, y permitir la subida múltiple simultánea tanto por selector de archivos como por arrastrar y soltar (drag & drop).",
+  "updatedAt":  "2026-09-25T18:40:24.118983508Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
