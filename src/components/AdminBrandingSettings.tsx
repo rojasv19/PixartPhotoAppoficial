@@ -8,9 +8,11 @@ import {
   Upload, Trash2, FileImage, Video, Play, SlidersHorizontal,
   Key, Users, HardDrive, FolderPlus, UserPlus, ShieldAlert, Sparkle, Info, X
 } from 'lucide-react';
-import { StudioBrandingConfig, BrandIconName, ColorPreset, ModalTextsConfig } from '../types';
+import { StudioBrandingConfig, BrandIconName, ColorPreset, ModalTextsConfig, TypographyStyle } from '../types';
 import { COLOR_PRESET_MAP, DEFAULT_BRANDING, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
 import { BrandIcon } from './BrandIcon';
+import { TypographyControl } from './TypographyControl';
+import { typographyToStyle } from '../services/googleFontsService';
 
 interface AdminBrandingSettingsProps {
   branding: StudioBrandingConfig;
@@ -133,6 +135,16 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
 
   const handleFieldChange = <K extends keyof StudioBrandingConfig>(field: K, value: StudioBrandingConfig[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCustomTypographyChange = (key: string, style: TypographyStyle) => {
+    setFormData(prev => ({
+      ...prev,
+      customTypographyMap: {
+        ...(prev.customTypographyMap || {}),
+        [key]: style,
+      },
+    }));
   };
 
   const handleModalTextChange = <M extends keyof ModalTextsConfig, F extends keyof ModalTextsConfig[M]>(
@@ -475,19 +487,28 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
 
             {/* Mock Hero Content Preview */}
             <div className="p-6 sm:p-8 text-center space-y-3 relative z-10">
-              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${activeColorTheme.twBadgeBg} ${activeColorTheme.twBadgeBorder} ${activeColorTheme.twBadgeText}`}>
+              <div 
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${activeColorTheme.twBadgeBg} ${activeColorTheme.twBadgeBorder} ${activeColorTheme.twBadgeText}`}
+                style={typographyToStyle(formData.customTypographyMap?.portalHeroBadge)}
+              >
                 <Sparkles className="w-3 h-3" />
                 <span>{formData.portalHeroBadge}</span>
               </div>
 
-              <h3 className="text-lg sm:text-2xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-sm text-white">
+              <h3 
+                className="text-lg sm:text-2xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-sm text-white"
+                style={typographyToStyle(formData.customTypographyMap?.portalHeroTitle || formData.customTypographyMap?.globalHeading)}
+              >
                 {formData.portalHeroTitle}{' '}
                 <span className={`${activeColorTheme.twText} italic drop-shadow-sm`}>
                   {formData.portalHeroHighlight}
                 </span>
               </h3>
 
-              <p className="text-xs text-slate-200 max-w-md mx-auto line-clamp-2 drop-shadow-xs">
+              <p 
+                className="text-xs text-slate-200 max-w-md mx-auto line-clamp-2 drop-shadow-xs"
+                style={typographyToStyle(formData.customTypographyMap?.portalHeroSubtitle)}
+              >
                 {formData.portalHeroSubtitle}
               </p>
 
@@ -1616,23 +1637,45 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Estilo Tipográfico para Títulos:
-              </label>
-              <select
-                id="branding-font-select"
-                value={formData.fontHeadingStyle}
-                onChange={(e) => handleFieldChange('fontHeadingStyle', e.target.value as any)}
-                className={`w-full text-xs rounded-xl p-2.5 border focus:ring-2 focus:outline-none ${
-                  isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
-                }`}
-              >
-                <option value="serif">Editorial Serif Clásico (Playfair / Garamond)</option>
-                <option value="sans">Modern Sans Pro (Plus Jakarta Sans)</option>
-                <option value="editorial">Cormorant Garamond (Alta Costura)</option>
-                <option value="mono">Clean Mono (Estudio Técnico)</option>
-              </select>
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className={`text-xs font-bold block ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Catálogo Tipográfico Universal (Google Fonts):
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Selecciona cualquier fuente de Google Fonts para los títulos y encabezados de todo el estudio. Se cargan y actualizan en tiempo real.
+                  </p>
+                </div>
+              </div>
+
+              <TypographyControl
+                label="Fuente Principal de Títulos"
+                value={{
+                  fontFamily: formData.fontFamily || (formData.fontHeadingStyle === 'editorial' ? 'Cormorant Garamond' : formData.fontHeadingStyle === 'mono' ? 'Space Mono' : formData.fontHeadingStyle === 'sans' ? 'Plus Jakarta Sans' : 'Playfair Display'),
+                  fontSize: formData.fontSize,
+                  fontWeight: formData.fontWeight,
+                  color: formData.fontColor,
+                  letterSpacing: formData.fontLetterSpacing,
+                }}
+                onChange={(style) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    fontFamily: style.fontFamily,
+                    fontSize: style.fontSize,
+                    fontWeight: style.fontWeight,
+                    fontColor: style.color,
+                    fontLetterSpacing: style.letterSpacing,
+                    customTypographyMap: {
+                      ...(prev.customTypographyMap || {}),
+                      globalHeading: style,
+                    }
+                  }));
+                }}
+                sampleText={formData.studioName || 'Somos Pixart Photography'}
+                compact={false}
+                theme={theme}
+              />
             </div>
           </div>
         </div>
@@ -1654,9 +1697,18 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Badge Superior del Hero:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Badge Superior del Hero:
+                </label>
+                <TypographyControl
+                  label="Tipografía Badge"
+                  value={formData.customTypographyMap?.portalHeroBadge}
+                  onChange={(style) => handleCustomTypographyChange('portalHeroBadge', style)}
+                  sampleText={formData.portalHeroBadge || 'Somos Pixart'}
+                  theme={theme}
+                />
+              </div>
               <input
                 type="text"
                 id="branding-hero-badge-input"
@@ -1671,9 +1723,18 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Título Principal del Hero:
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Título Principal del Hero:
+                  </label>
+                  <TypographyControl
+                    label="Tipografía Título Hero"
+                    value={formData.customTypographyMap?.portalHeroTitle}
+                    onChange={(style) => handleCustomTypographyChange('portalHeroTitle', style)}
+                    sampleText={formData.portalHeroTitle || 'Galerías Fotográficas'}
+                    theme={theme}
+                  />
+                </div>
                 <input
                   type="text"
                   id="branding-hero-title-input"
@@ -1704,9 +1765,18 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                Subtítulo Descriptivo del Hero:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Subtítulo Descriptivo del Hero:
+                </label>
+                <TypographyControl
+                  label="Tipografía Subtítulo Hero"
+                  value={formData.customTypographyMap?.portalHeroSubtitle}
+                  onChange={(style) => handleCustomTypographyChange('portalHeroSubtitle', style)}
+                  sampleText={formData.portalHeroSubtitle || 'Visualización y descarga directa en alta fidelidad'}
+                  theme={theme}
+                />
+              </div>
               <textarea
                 id="branding-hero-subtitle-input"
                 rows={2}
@@ -1965,9 +2035,18 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Texto de la Marca de Agua:
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Texto de la Marca de Agua:
+                  </label>
+                  <TypographyControl
+                    label="Tipografía Marca de Agua"
+                    value={formData.customTypographyMap?.watermark}
+                    onChange={(style) => handleCustomTypographyChange('watermark', style)}
+                    sampleText={formData.watermarkText || 'SOMOS PIXART • PROOF'}
+                    theme={theme}
+                  />
+                </div>
                 <input
                   type="text"
                   id="branding-watermark-text-input"

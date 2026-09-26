@@ -274,6 +274,11 @@ export interface StudioBrandingConfig {
   colorPreset: ColorPreset;
   customPrimaryColor: string;
   fontHeadingStyle: 'serif' | 'sans' | 'mono' | 'editorial';
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  fontColor?: string;
+  fontLetterSpacing?: string;
   borderRadiusStyle: 'smooth' | 'modern' | 'minimal';
   
   // Public Portal Hero & Multimedia Background

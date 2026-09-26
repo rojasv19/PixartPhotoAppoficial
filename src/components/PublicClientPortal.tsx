@@ -9,6 +9,7 @@ import { formatBytes } from '../services/storageService';
 import { COLOR_PRESET_MAP, DEFAULT_BRANDING } from '../services/brandingService';
 import { BrandIcon } from './BrandIcon';
 import { LockedGalleryModal } from './LockedGalleryModal';
+import { typographyToStyle } from '../services/googleFontsService';
 
 interface PublicClientPortalProps {
   currentUser: User | null;
@@ -151,19 +152,28 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-16 text-center space-y-6 flex flex-col items-center justify-center my-auto">
           
-          <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}>
+          <div 
+            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}
+            style={typographyToStyle(branding?.customTypographyMap?.portalHeroBadge)}
+          >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{branding?.portalHeroBadge || 'Somos Pixart • Plataforma Fotográfica'}</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-serif-display leading-tight max-w-4xl mx-auto drop-shadow-md text-white">
+          <h1 
+            className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-serif-display leading-tight max-w-4xl mx-auto drop-shadow-md text-white"
+            style={typographyToStyle(branding?.customTypographyMap?.portalHeroTitle || branding?.customTypographyMap?.globalHeading)}
+          >
             {branding?.portalHeroTitle || 'Galerías fotográficas privadas en'}{' '}
             <span className={`${colorTheme.twText} italic drop-shadow-md`}>
               {branding?.portalHeroHighlight || 'máxima resolución.'}
             </span>
           </h1>
 
-          <p className="text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-slate-200 drop-shadow-sm font-medium">
+          <p 
+            className="text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-slate-200 drop-shadow-sm font-medium"
+            style={typographyToStyle(branding?.customTypographyMap?.portalHeroSubtitle)}
+          >
             {branding?.portalHeroSubtitle || 'Visualización, selección de favoritas y descarga directa en alta fidelidad RAW y 4K con almacenamiento seguro.'}
           </p>
 
@@ -279,12 +289,18 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
                 {/* Card Body */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-1.5">
-                    <h3 className={`font-bold text-lg font-serif-display transition-colors line-clamp-1 group-hover:underline ${
-                      isDark ? 'text-white' : 'text-slate-900'
-                    }`}>
+                    <h3 
+                      className={`font-bold text-lg font-serif-display transition-colors line-clamp-1 group-hover:underline ${
+                        isDark ? 'text-white' : 'text-slate-900'
+                      }`}
+                      style={typographyToStyle(gallery.titleTypography || branding?.customTypographyMap?.galleryTitle)}
+                    >
                       {gallery.title}
                     </h3>
-                    <p className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <p 
+                      className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}
+                      style={typographyToStyle(gallery.subtitleTypography || branding?.customTypographyMap?.gallerySubtitle)}
+                    >
                       {gallery.subtitle || gallery.description}
                     </p>
                   </div>

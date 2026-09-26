@@ -392,7 +392,21 @@ export function loadGalleriesFromStorage(): GallerySession[] {
 }
 
 export function saveGalleriesToStorage(galleries: GallerySession[]) {
-  localStorage.setItem(STORAGE_KEYS.GALLERIES, JSON.stringify(galleries));
+  try {
+    // Sanitize heavy cover images to prevent quota overflow
+    const sanitized = galleries.map(g => {
+      if (g.coverImage && g.coverImage.startsWith('data:') && g.coverImage.length > 50000) {
+        return {
+          ...g,
+          coverImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80',
+        };
+      }
+      return g;
+    });
+    localStorage.setItem(STORAGE_KEYS.GALLERIES, JSON.stringify(sanitized));
+  } catch (err) {
+    console.warn('Notice: localStorage quota exceeded for galleries cache, using memory/cloud state.', err);
+  }
 }
 
 export function loadImagesFromStorage(): GalleryImage[] {
@@ -402,8 +416,8 @@ export function loadImagesFromStorage(): GalleryImage[] {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map((img: GalleryImage) => {
-          const isHugeUrl = img.url && img.url.startsWith('data:') && img.url.length > 300000;
-          const isHugeHighRes = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 300000;
+          const isHugeUrl = img.url && img.url.startsWith('data:') && img.url.length > 50000;
+          const isHugeHighRes = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 50000;
           if (isHugeUrl || isHugeHighRes) {
             return {
               ...img,
@@ -416,33 +430,40 @@ export function loadImagesFromStorage(): GalleryImage[] {
       }
     }
   } catch (e) {
-    console.warn('Error loading images from storage, falling back to initial images:', e);
+    console.warn('Notice: Error reading cached images from storage, falling back to initial data:', e);
   }
   return INITIAL_IMAGES;
 }
 
 export function saveImagesToStorage(images: GalleryImage[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(images));
+    // Sanitize any massive base64 data URLs before writing to localStorage
+    const sanitized = images.map(img => {
+      const urlIsHuge = img.url && img.url.startsWith('data:') && img.url.length > 30000;
+      const highResIsHuge = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 30000;
+      if (urlIsHuge || highResIsHuge) {
+        return {
+          ...img,
+          url: urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80' : img.url,
+          highResUrl: highResIsHuge ? (urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85' : img.url) : img.highResUrl,
+        };
+      }
+      return img;
+    });
+
+    localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitized));
   } catch (err) {
-    console.warn('localStorage quota exceeded when saving images. Sanitizing large base64 URLs...', err);
+    // If quota still exceeded, trim down to essential lightweight entries
     try {
-      // If quota exceeded, sanitize images: keep lightweight preview or cloud URLs instead of massive raw base64
-      const sanitized = images.map(img => {
-        const urlIsHuge = img.url && img.url.startsWith('data:') && img.url.length > 100000;
-        const highResIsHuge = img.highResUrl && img.highResUrl.startsWith('data:') && img.highResUrl.length > 100000;
-        if (urlIsHuge || highResIsHuge) {
-          return {
-            ...img,
-            url: urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80' : img.url,
-            highResUrl: highResIsHuge ? (urlIsHuge ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=85' : img.url) : img.highResUrl,
-          };
-        }
-        return img;
-      });
-      localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitized));
+      const trimmed = images.slice(0, 25).map(img => ({
+        ...img,
+        url: img.url && img.url.startsWith('data:') ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80' : img.url,
+        highResUrl: img.highResUrl && img.highResUrl.startsWith('data:') ? undefined : img.highResUrl,
+      }));
+      localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(trimmed));
     } catch (finalErr) {
-      console.error('Critical storage quota error; skipping localStorage write for images:', finalErr);
+      // Graceful fallback: images remain in React memory state and InstantDB cloud sync
+      console.warn('Notice: browser localStorage quota reached; image cache skipped. In-memory state and cloud sync are active.');
     }
   }
 }

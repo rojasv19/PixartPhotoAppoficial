@@ -12,6 +12,8 @@ import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { PhotoLightbox } from './PhotoLightbox';
 import { BatchDownloadModal } from './BatchDownloadModal';
 import { WatermarkOverlay } from './WatermarkOverlay';
+import { TypographyControl } from './TypographyControl';
+import { typographyToStyle } from '../services/googleFontsService';
 
 interface GalleryViewProps {
   gallery: GallerySession;
@@ -391,12 +393,54 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
             {/* Main Title & Subtitle */}
             <div className="max-w-3xl space-y-3">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white font-serif-display leading-tight">
-                {gallery.title}
-              </h1>
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                {gallery.subtitle || gallery.description}
-              </p>
+              <div className="flex items-center gap-3">
+                <h1 
+                  className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white font-serif-display leading-tight"
+                  style={typographyToStyle(gallery.titleTypography || branding?.customTypographyMap?.galleryTitle)}
+                >
+                  {gallery.title}
+                </h1>
+                {currentUser?.role === 'admin' && onUpdateGallery && (
+                  <div className="shrink-0">
+                    <TypographyControl
+                      label="Tipografía del Título"
+                      value={gallery.titleTypography}
+                      onChange={(style) => {
+                        onUpdateGallery({
+                          ...gallery,
+                          titleTypography: style,
+                        });
+                      }}
+                      sampleText={gallery.title}
+                      theme={theme}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <p 
+                  className="text-slate-300 text-sm sm:text-base leading-relaxed"
+                  style={typographyToStyle(gallery.subtitleTypography || branding?.customTypographyMap?.gallerySubtitle)}
+                >
+                  {gallery.subtitle || gallery.description}
+                </p>
+                {currentUser?.role === 'admin' && onUpdateGallery && (
+                  <div className="shrink-0">
+                    <TypographyControl
+                      label="Tipografía del Subtítulo"
+                      value={gallery.subtitleTypography}
+                      onChange={(style) => {
+                        onUpdateGallery({
+                          ...gallery,
+                          subtitleTypography: style,
+                        });
+                      }}
+                      sampleText={gallery.subtitle || gallery.description}
+                      theme={theme}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Quick Stat summary pills */}

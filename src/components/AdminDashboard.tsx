@@ -5,13 +5,14 @@ import {
   Sparkles, Search, Filter, ArrowUpRight, CheckCircle2, AlertTriangle, 
   Upload, Sliders, Calendar, MapPin, Lock, FileText, Activity, Shield, RefreshCw, X, Camera, Palette, Heart
 } from 'lucide-react';
-import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig } from '../types';
+import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig, TypographyStyle } from '../types';
 import { formatBytes, calculateServerStats, downloadSingleImage } from '../services/storageService';
 import { COLOR_PRESET_MAP, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
 import { DEFAULT_PROFILE_AVATAR } from '../data/photographyAvatars';
 import { AdminBrandingSettings } from './AdminBrandingSettings';
 import { AdminFavoritesView } from './AdminFavoritesView';
 import { WatermarkOverlay } from './WatermarkOverlay';
+import { TypographyControl } from './TypographyControl';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -126,7 +127,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // New Gallery Form State
   const [galleryTitle, setGalleryTitle] = useState('');
+  const [galleryTitleTypography, setGalleryTitleTypography] = useState<TypographyStyle>({});
   const [gallerySubtitle, setGallerySubtitle] = useState('');
+  const [gallerySubtitleTypography, setGallerySubtitleTypography] = useState<TypographyStyle>({});
   const [galleryCategory, setGalleryCategory] = useState<GallerySession['category']>('boda');
   const [galleryDate, setGalleryDate] = useState(new Date().toISOString().split('T')[0]);
   const [galleryLocation, setGalleryLocation] = useState('');
@@ -266,7 +269,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       onUpdateGallery({
         ...editingGallery,
         title: galleryTitle,
+        titleTypography: galleryTitleTypography,
         subtitle: gallerySubtitle,
+        subtitleTypography: gallerySubtitleTypography,
         category: galleryCategory,
         eventDate: galleryDate,
         location: galleryLocation,
@@ -291,8 +296,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } else {
       onCreateGallery({
         title: galleryTitle,
+        titleTypography: galleryTitleTypography,
         slug: galleryTitle.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         subtitle: gallerySubtitle,
+        subtitleTypography: gallerySubtitleTypography,
         clientIds: gallerySelectedClients,
         clientNames: assignedNames,
         category: galleryCategory,
@@ -324,7 +331,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const resetGalleryForm = () => {
     setGalleryTitle('');
+    setGalleryTitleTypography({});
     setGallerySubtitle('');
+    setGallerySubtitleTypography({});
     setGalleryCategory('boda');
     setGalleryDate(new Date().toISOString().split('T')[0]);
     setGalleryLocation('');
@@ -348,7 +357,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const openEditGalleryModal = (gal: GallerySession) => {
     setEditingGallery(gal);
     setGalleryTitle(gal.title);
+    setGalleryTitleTypography(gal.titleTypography || {});
     setGallerySubtitle(gal.subtitle || '');
+    setGallerySubtitleTypography(gal.subtitleTypography || {});
     setGalleryCategory(gal.category);
     setGalleryDate(gal.eventDate);
     setGalleryLocation(gal.location);
@@ -2256,9 +2267,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 
                 {/* Title */}
                 <div className="sm:col-span-2 space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {galleryModalTexts.titleLabel || 'Título del Evento / Sesión:'}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                      {galleryModalTexts.titleLabel || 'Título del Evento / Sesión:'}
+                    </label>
+                    <TypographyControl
+                      label="Tipografía del Título"
+                      value={galleryTitleTypography}
+                      onChange={setGalleryTitleTypography}
+                      sampleText={galleryTitle || 'Camila & David — Boda'}
+                      theme={theme}
+                    />
+                  </div>
                   <input
                     id="input-gallery-title"
                     type="text"
@@ -2266,6 +2286,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     value={galleryTitle}
                     onChange={(e) => setGalleryTitle(e.target.value)}
                     placeholder={galleryModalTexts.titlePlaceholder || 'Ej. Camila & David — Boda en Hacienda Real'}
+                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                      isDark 
+                        ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
+                        : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
+                    }`}
+                  />
+                </div>
+
+                {/* Subtitle / Descripción Corta */}
+                <div className="sm:col-span-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                      Subtítulo o Frase de la Sesión:
+                    </label>
+                    <TypographyControl
+                      label="Tipografía del Subtítulo"
+                      value={gallerySubtitleTypography}
+                      onChange={setGallerySubtitleTypography}
+                      sampleText={gallerySubtitle || 'Celebración inolvidable bajo el atardecer'}
+                      theme={theme}
+                    />
+                  </div>
+                  <input
+                    id="input-gallery-subtitle"
+                    type="text"
+                    value={gallerySubtitle}
+                    onChange={(e) => setGallerySubtitle(e.target.value)}
+                    placeholder="Ej. Celebración inolvidable bajo la luz del atardecer"
                     className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
                       isDark 
                         ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 

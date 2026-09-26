@@ -59,6 +59,7 @@ export default function App() {
     images: {},
     users: {},
     logs: {},
+    studioSettings: {},
   });
 
   // Local state cache / fallbacks
@@ -235,6 +236,41 @@ export default function App() {
   // Studio Branding & Customization State
   const [branding, setBranding] = useState<StudioBrandingConfig>(() => loadBrandingFromStorage());
 
+  // Sync remote branding from InstantDB across all devices
+  useEffect(() => {
+    if (dbData?.studioSettings && dbData.studioSettings.length > 0) {
+      const setting = (dbData.studioSettings as any[]).find(s => s.key === 'studio_branding') || (dbData.studioSettings as any[])[0];
+      if (setting && setting.configJson) {
+        try {
+          const parsed = JSON.parse(setting.configJson);
+          if (parsed && typeof parsed === 'object') {
+            setBranding(prev => ({
+              ...prev,
+              ...parsed,
+            }));
+            saveBrandingToStorage(parsed);
+          }
+        } catch (e) {
+          console.warn('Notice: Error parsing remote branding config:', e);
+        }
+      }
+    }
+  }, [dbData?.studioSettings]);
+
+  // Preload any active Google Fonts configured in studio branding
+  useEffect(() => {
+    const fontsToPreload: (string | undefined)[] = [
+      branding.fontFamily,
+      branding.customTypographyMap?.galleryTitle?.fontFamily,
+      branding.customTypographyMap?.gallerySubtitle?.fontFamily,
+      branding.customTypographyMap?.watermark?.fontFamily,
+      branding.customTypographyMap?.portalHeroTitle?.fontFamily,
+      branding.customTypographyMap?.portalHeroSubtitle?.fontFamily,
+      branding.customTypographyMap?.portalHeroBadge?.fontFamily,
+    ];
+    preloadFonts(fontsToPreload);
+  }, [branding]);
+
   useEffect(() => {
     updateDocumentFaviconAndTitle(branding);
   }, [branding]);
@@ -242,6 +278,7 @@ export default function App() {
   const handleSaveBranding = (updated: StudioBrandingConfig) => {
     setBranding(updated);
     saveBrandingToStorage(updated);
+    saveBrandingToDb(updated).catch(err => console.warn('Notice: Remote branding sync warning:', err));
     addAuditLog(
       'Configuración de Marca Actualizada',
       `Se actualizaron los parámetros visuales (Logo: ${updated.logoType}, Color: ${updated.colorPreset}, Nombre: ${updated.studioName})`
