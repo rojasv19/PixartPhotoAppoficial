@@ -36,6 +36,7 @@ const _schema = i.schema({
       clientIds: i.json<string[]>().optional(),
       clientNames: i.json<string[]>().optional(),
       feedbackList: i.json<any[]>().optional(),
+      coverImagePosition: i.string().optional(),
     }),
     images: i.entity({
       galleryId: i.string(),
@@ -60,6 +61,7 @@ const _schema = i.schema({
       optimized: i.boolean(),
       clientNote: i.string().optional(),
       excludeWatermark: i.boolean().optional(),
+      imagePosition: i.string().optional(),
     }),
     users: i.entity({
       name: i.string(),

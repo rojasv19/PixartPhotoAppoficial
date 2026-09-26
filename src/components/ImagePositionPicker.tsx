@@ -73,7 +73,21 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const activePosition: ImageCardinalPosition = (POSITION_MAP[value as ImageCardinalPosition] ? value : 'center') as ImageCardinalPosition;
+  // Optimistic local position so changes react instantaneously on click
+  const [activePosition, setActivePosition] = useState<ImageCardinalPosition>(() => {
+    return (POSITION_MAP[value as ImageCardinalPosition] ? value : 'center') as ImageCardinalPosition;
+  });
+
+  useEffect(() => {
+    if (value && POSITION_MAP[value as ImageCardinalPosition]) {
+      setActivePosition(value as ImageCardinalPosition);
+    }
+  }, [value]);
+
+  const handleSelectPosition = (newPos: ImageCardinalPosition) => {
+    setActivePosition(newPos);
+    onChange(newPos);
+  };
 
   // Calculate dynamic viewport coordinates for Portal mounting
   const updatePosition = useCallback(() => {
@@ -82,7 +96,7 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
     const popoverWidth = 310;
     const popoverHeight = onApplyToAll ? 440 : 380;
     
-    // Horizontal positioning: align with button left or right, clamped to viewport
+    // Horizontal positioning
     let left = rect.left;
     if (left + popoverWidth > window.innerWidth - 12) {
       left = window.innerWidth - popoverWidth - 12;
@@ -91,14 +105,13 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
       left = 12;
     }
 
-    // Vertical positioning: default below trigger, flip up if close to bottom
+    // Vertical positioning
     let top = rect.bottom + 8;
     if (top + popoverHeight > window.innerHeight - 12) {
       const topFlipped = rect.top - popoverHeight - 8;
       if (topFlipped >= 12) {
         top = topFlipped;
       } else {
-        // Fallback: clamp within screen
         top = Math.max(12, window.innerHeight - popoverHeight - 12);
       }
     }
@@ -107,6 +120,7 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
   }, [onApplyToAll]);
 
   const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!isOpen) {
       updatePosition();
@@ -131,12 +145,10 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleWindowResize);
-    window.addEventListener('scroll', updatePosition, true);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleWindowResize);
-      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [isOpen, updatePosition]);
 
@@ -154,10 +166,11 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
 
   return (
     <>
-      {/* Trigger Button (stays in regular layout flow) */}
+      {/* Trigger Button */}
       <button
         ref={triggerRef}
         type="button"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={handleToggle}
         className={`inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer select-none shadow-xs ${
           compact ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5'
@@ -177,13 +190,14 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
         </span>
       </button>
 
-      {/* Floating Popover rendered through React Portal to document.body (Never clipped by tables or overflow:hidden) */}
+      {/* Floating Popover mounted in document.body via Portal */}
       {isOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[99990] flex items-start justify-start pointer-events-auto">
+        <div className="image-position-popover-portal">
           {/* Backdrop overlay */}
           <div 
-            className="fixed inset-0 bg-black/25 backdrop-blur-[1px] transition-opacity"
-            onClick={(e) => {
+            className="fixed inset-0 z-[99990] bg-black/25 backdrop-blur-[0.5px]"
+            onMouseDown={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               setIsOpen(false);
             }} 
@@ -192,14 +206,15 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
           {/* Floating Popper Panel */}
           <div
             ref={popoverRef}
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
               top: `${coords.top}px`,
               left: `${coords.left}px`,
               width: '310px',
+              zIndex: 99999,
             }}
-            className={`z-[99999] p-3.5 rounded-2xl border shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none ${
+            className={`p-3.5 rounded-2xl border shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none ${
               isDark 
                 ? 'bg-stone-950/98 border-stone-800 text-stone-100 shadow-black/80' 
                 : 'bg-white/98 border-slate-200 text-slate-800 shadow-slate-900/20'
@@ -216,7 +231,12 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
                 className="p-1 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -280,8 +300,11 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => {
-                        onChange(item.id);
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSelectPosition(item.id);
                       }}
                       className={`flex flex-col items-center justify-center p-2 rounded-lg text-[10px] transition-all cursor-pointer ${
                         isSelected
@@ -305,7 +328,12 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
               <span className="text-[10px] text-stone-400 shrink-0">Rápidos:</span>
               <button
                 type="button"
-                onClick={() => onChange('center')}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelectPosition('center');
+                }}
                 className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   activePosition === 'center'
                     ? 'bg-blue-600 text-white font-bold'
@@ -316,7 +344,12 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => onChange('center-top')}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelectPosition('center-top');
+                }}
                 className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   activePosition === 'center-top'
                     ? 'bg-blue-600 text-white font-bold'
@@ -327,7 +360,12 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => onChange('center-bottom')}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelectPosition('center-bottom');
+                }}
                 className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   activePosition === 'center-bottom'
                     ? 'bg-blue-600 text-white font-bold'
@@ -343,7 +381,10 @@ export const ImagePositionPicker: React.FC<ImagePositionPickerProps> = ({
               <div className="pt-2.5 mt-2.5 border-t border-stone-800/60">
                 <button
                   type="button"
-                  onClick={() => {
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     onApplyToAll(activePosition);
                     setIsOpen(false);
                   }}

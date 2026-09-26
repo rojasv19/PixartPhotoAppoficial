@@ -177,23 +177,32 @@ export default function App() {
 
   const galleries: GallerySession[] = useMemo(() => {
     if (dbData?.galleries && dbData.galleries.length > 0) {
-      return (dbData.galleries as unknown as GallerySession[]).map(g => ({
-        ...g,
-        clientIds: Array.isArray(g.clientIds) ? g.clientIds : [],
-        clientNames: Array.isArray(g.clientNames) ? g.clientNames : [],
-        feedbackList: Array.isArray(g.feedbackList) ? g.feedbackList : [],
-      }));
+      return (dbData.galleries as unknown as GallerySession[]).map(g => {
+        const local = localGalleries.find(l => l.id === g.id || toUuid(l.id) === toUuid(g.id));
+        return {
+          ...g,
+          coverImagePosition: local?.coverImagePosition || g.coverImagePosition || 'center',
+          coverImage: local?.coverImage || g.coverImage,
+          clientIds: Array.isArray(g.clientIds) ? g.clientIds : (local?.clientIds || []),
+          clientNames: Array.isArray(g.clientNames) ? g.clientNames : (local?.clientNames || []),
+          feedbackList: Array.isArray(g.feedbackList) ? g.feedbackList : (local?.feedbackList || []),
+        };
+      });
     }
     return localGalleries;
   }, [dbData?.galleries, localGalleries]);
 
   const images: GalleryImage[] = useMemo(() => {
     if (dbData?.images && dbData.images.length > 0) {
-      return (dbData.images as unknown as GalleryImage[]).map(img => ({
-        ...img,
-        favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : [],
-        tags: Array.isArray(img.tags) ? img.tags : [],
-      }));
+      return (dbData.images as unknown as GalleryImage[]).map(img => {
+        const local = localImages.find(l => l.id === img.id || toUuid(l.id) === toUuid(img.id));
+        return {
+          ...img,
+          imagePosition: local?.imagePosition || img.imagePosition || 'center',
+          favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : (local?.favoriteByUsers || []),
+          tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
+        };
+      });
     }
     return localImages;
   }, [dbData?.images, localImages]);
@@ -549,21 +558,29 @@ export default function App() {
 
   // Update Image metadata / retouch notes
   const handleUpdateImage = (updatedImage: GalleryImage) => {
-    setLocalImages(prev => prev.map(img => (img.id === updatedImage.id || toUuid(img.id) === toUuid(updatedImage.id)) ? updatedImage : img));
+    setLocalImages(prev => {
+      const next = prev.map(img => (img.id === updatedImage.id || toUuid(img.id) === toUuid(updatedImage.id)) ? updatedImage : img);
+      saveImagesToStorage(next);
+      return next;
+    });
     updateImageInDb(updatedImage).catch(err => console.error('Error updating image in DB:', err));
     addAuditLog('Foto Actualizada', `Se actualizaron notas o estado de retoque para "${updatedImage.title}".`);
   };
 
   // Batch update image framing / position for all images in a gallery
   const handleBatchUpdateImagePosition = (galleryId: string, position: string) => {
-    setLocalImages(prev => prev.map(img => {
-      if (img.galleryId === galleryId || toUuid(img.galleryId) === toUuid(galleryId)) {
-        const updated = { ...img, imagePosition: position };
-        updateImageInDb(updated).catch(err => console.error('Error updating image in DB:', err));
-        return updated;
-      }
-      return img;
-    }));
+    setLocalImages(prev => {
+      const next = prev.map(img => {
+        if (img.galleryId === galleryId || toUuid(img.galleryId) === toUuid(galleryId)) {
+          const updated = { ...img, imagePosition: position };
+          updateImageInDb(updated).catch(err => console.error('Error updating image in DB:', err));
+          return updated;
+        }
+        return img;
+      });
+      saveImagesToStorage(next);
+      return next;
+    });
     const gal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
     addAuditLog('Encuadre Masivo Aplicado', `Se actualizó el encuadre a todas las fotos de la sesión "${gal?.title || 'Galería'}".`);
   };
@@ -685,7 +702,11 @@ export default function App() {
   };
 
   const handleUpdateGallery = (updatedGallery: GallerySession) => {
-    setLocalGalleries(prev => prev.map(g => (g.id === updatedGallery.id || toUuid(g.id) === toUuid(updatedGallery.id)) ? updatedGallery : g));
+    setLocalGalleries(prev => {
+      const next = prev.map(g => (g.id === updatedGallery.id || toUuid(g.id) === toUuid(updatedGallery.id)) ? updatedGallery : g);
+      saveGalleriesToStorage(next);
+      return next;
+    });
     updateGalleryInDb(updatedGallery).catch(err => console.error('InstantDB update gallery error:', err));
     addAuditLog('Sesión Actualizada', `Modificó detalles y permisos de la sesión "${updatedGallery.title}".`, updatedGallery.title);
   };
