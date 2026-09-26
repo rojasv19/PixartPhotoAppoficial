@@ -1,44 +1,103 @@
-# Plan de Implementación: Modal 90vw/vh, Corrección de Encuadre con Portal Flotante y Encuadre Global de Galería
+# Plan de Implementación: Restauración de Fotos y Portadas del Estudio & Blindaje de Base de Datos
 
-## 1. Contexto y Objetivos
-- **Rediseño del Modal de Galería:** Ajustar el modal de creación y edición de sesiones fotográficas a un tamaño de `90vw` y `90vh`, con cabecera y pie de página fijos, y un cuerpo scrollable (`overflow-y-auto`) organizado en dos columnas amplias para que todos los campos sean visibles y cómodos de editar sin desbordar la pantalla.
-- **Corrección de la Herramienta de Encuadre (`ImagePositionPicker`):** Evitar que el menú desplegable quede recortado u oculto por contenedores con `overflow-hidden` o celdas de tabla. Se utilizará `createPortal` hacia `document.body` y cálculo de coordenadas dinámicas (`getBoundingClientRect`), asegurando que siempre flote con máxima prioridad visual (`z-[9999]`).
-- **Encuadre en Portadas de Galería:** Incorporar la herramienta de encuadre visual directamente en las tarjetas de galería del panel administrativo, en el visor de cabecera y dentro del modal de edición.
-- **Actualización en Lote para Todas las Fotos de la Galería:** Añadir una herramienta para seleccionar una posición cardinal y aplicarla en lote a todas las fotos existentes de la galería seleccionada, sincronizándolo con InstantDB y almacenamiento local.
+## Resumen Ejecutivo
+Solucionar de raíz el problema donde las fotografías y portadas de las galerías resultaron duplicadas o sobreescritas por una sola imagen al interactuar con el encuadre. Se implementará un mecanismo en el panel de administración para restaurar las fotos y portadas originales previas, se blindará la capa de mutaciones en InstantDB y almacenamiento local para que los ajustes de encuadre (`object-position`) operen de forma 100% aislada sobre coordenadas visuales sin tocar nunca URLs de imágenes ni archivos RAW, y se garantizará la recuperación íntegra de la colección del estudio.
 
 ---
 
-## 2. Cambios Específicos por Archivo
+## Decisiones Críticas y Confirmadas por el Usuario
 
-### A. `src/components/ImagePositionPicker.tsx`
-- Refactorizar el panel flotante para renderizarse mediante `createPortal` en `document.body`.
-- Calcular la posición absoluta en pantalla utilizando las coordenadas (`getBoundingClientRect`) del botón activador.
-- Añadir detección de bordes de la ventana (para evitar que se salga por los márgenes) y cierre al hacer clic fuera o pulsar Escape.
-- Garantizar estilo `z-[9999]` para máxima prioridad visual en cualquier vista (tablas, tarjetas y modales).
-
-### B. `src/components/AdminDashboard.tsx`
-- **Reorganización del Modal de Galería (90vw × 90vh):**
-  - Cambiar el contenedor a `w-[90vw] max-w-[90vw] h-[90vh] max-h-[90vh] flex flex-col rounded-2xl`.
-  - Encabezado fijo con título de sesión y botón de cierre.
-  - Pie fijo con botones de acción ("Guardar Cambios" / "Crear Galería" y "Cancelar").
-  - Contenido scrollable en dos columnas equilibradas:
-    - **Columna izquierda:** Datos generales (Título, Cliente asignado, Fecha del evento, Estado, Privacidad y contraseña opcional).
-    - **Columna derecha:** Portada de la galería (selector de imagen, previsualización en vivo, y herramienta de encuadre 3×3 integrada).
-- **Encuadre en Tarjetas de Galería:**
-  - Agregar botón de encuadre rápido en cada tarjeta de sesión en el listado de galerías del admin.
-- **Función de Encuadre en Lote para la Galería:**
-  - Añadir control en el inspector de fotos / barra de galería para aplicar una posición cardinal a todas las fotos existentes de la sesión activa (`handleBatchUpdateImagePosition`).
-  - Sincronizar la actualización en lote tanto en el estado reactivo como en InstantDB.
-
-### C. `src/components/GalleryView.tsx`
-- Integrar el control de encuadre en lote directamente en la barra superior de acciones de la galería (accesible para el administrador/fotógrafo).
-- Aplicar la actualización inmediata a todas las fotografías de la galería en pantalla.
+> [!IMPORTANT]
+> Decisiones confirmadas a través del proceso de aclaración con el usuario:
+> - **Alcance del Problema:** Ocurrió en todas las galerías del estudio donde la misma fotografía quedó repetida en las posiciones y portadas.
+> - **Acción de Recuperación:** Implementar una herramienta de restauración accesible desde el panel de administración ("Gestor") para recuperar las fotografías y portadas originales de cada galería.
+> - **Protección Permanente:** Blindar las mutaciones de base de datos (`updateImagePositionInDb`, `updateGalleryCoverPositionInDb` y `batchUpdateImagePositionsInDb`) para aislar los campos de coordenadas y asegurar que los campos `url`, `highResUrl` y `coverImage` sean inmutables frente a cambios de encuadre.
 
 ---
 
-## 3. Verificación y Pruebas
-1. Abrir el modal de nueva galería y edición de galería: verificar que ocupe el 90% de la ventana tanto a lo ancho como a lo alto, con scroll suave y todos los campos accesibles.
-2. Hacer clic en el botón de encuadre en fotos individuales (tabla del inspector y tarjetas de galería): confirmar que el panel flotante aparezca completo, sin cortes ni solapamientos.
-3. Probar la herramienta de encuadre en la portada de la galería y verificar el cambio visual en la cabecera y tarjetas.
-4. Ejecutar la función de aplicar encuadre en lote a todas las imágenes y comprobar que todas las fotos de la sesión adopten la alineación seleccionada.
-5. Ejecutar linter y compilación (`compile_applet`) para garantizar cero errores de TypeScript.
+## 1. Visión General & Concepto Central
+
+- **Qué hace:** Proporciona un centro de recuperación y restauración en el panel de control del estudio (*AdminDashboard*) con opciones para:
+  1. Restaurar las fotografías originales de cualquier galería o de todo el estudio con un solo clic.
+  2. Restaurar la fotografía de portada original de cada sesión fotográfica.
+  3. Previsualizar y verificar el catálogo completo de fotos antes y después de aplicar cualquier alineación.
+  4. Garantizar que cambiar el encuadre (arriba, centro, abajo, etc.) solo altere la propiedad CSS / metadato de posición focal, sin reemplazar ni un solo byte de la URL de la imagen.
+- **Audiencia:** Fotógrafos profesionales y administradores del estudio Pixart Photo que requieren total confiabilidad en sus sesiones fotográficas y seguridad de sus datos.
+- **Valor Principal:** Integridad de datos absoluta: ningún ajuste estético o de encuadre podrá volver a sobreescribir las fotos del cliente ni la portada de la galería.
+
+---
+
+## 2. Experiencia de Usuario & Diseño Visual
+
+### Flujos Principales
+1. **Centro de Restauración en el Panel de Administración:**
+   - En la pestaña de *Sesiones & Galerías*, cada tarjeta de galería contará con un botón de acción rápida *"Restaurar Portada & Fotos Originales"*.
+   - En la cabecera del *Inspector de Almacenamiento & Fotos*, se habilitará un botón global *"Restaurar Catálogo de Fotos Originales"* con confirmación modal detallada.
+2. **Selector de Encuadre Seguro e Independiente:**
+   - El componente `ImagePositionPicker` mostrará con claridad que solo ajusta el punto focal visual (3×3) y emitirá exclusivamente el string de posición (`center`, `center-top`, etc.).
+   - Tanto la portada como las fotos en la cuadrícula y en el lightbox actualizarán su `object-position` en tiempo real sin recargar ni alterar la fuente de la imagen (`src`).
+3. **Modal de Edición de Galería:**
+   - En el modal reorganizado de 90vw × 90vh, la sección de *Fotografía de Portada* incluirá un botón para restaurar la foto de portada predeterminada de la sesión si se desea revertir cualquier cambio accidental.
+
+### Lenguaje Visual & Componentes
+- Siguiendo la constitución de diseño para fotografía profesional:
+  - **Lienzo:** Modo oscuro cinematográfico (`#0c0a09` / `stone-950`) y claro editorial (`#fafaf9`).
+  - **Sin Pills Innecesarios:** Metadatos como conteo de fotos, resolución y tamaño RAW mostrados con separadores tipográficos limpios (`·`, `/`).
+  - **Controles de Acción:** Botones contrastados con iconografía clara (`RotateCcw`, `ShieldCheck`, `Crosshair`) y estados hover bien definidos.
+
+---
+
+## 3. Decisiones de Producto & Trade-Offs
+
+- **Decisión 1: Estrategia de Restauración:**
+  - *Enfoque Elegido:* Proveer restauración selectiva (por sesión individual) y restauración global (para todo el catálogo del estudio), sincronizando inmediatamente en memoria, InstantDB y LocalStorage.
+  - *Por qué:* Permite al fotógrafo corregir una sesión específica sin alterar las demás, o solucionar todo el catálogo de una sola vez si todas las galerías fueron afectadas.
+- **Decisión 2: Separación de Mutaciones en la Capa de Datos:**
+  - *Enfoque Elegido:* Prohibir llamadas completas a `updateImageInDb` o `updateGalleryInDb` durante eventos de encuadre. Solo se permitirán transacciones granulares `tx.images[id].update({ imagePosition })` y `tx.galleries[id].update({ coverImagePosition })`.
+  - *Por qué:* Elimina la posibilidad física de que un objeto en memoria con una URL por defecto sobreescriba los datos persistidos en la base de datos remota.
+
+---
+
+## 4. Arquitectura Técnica & Estrategia de Datos
+
+### Diagrama de Flujo y Aislamiento de Mutaciones
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    INTERFAZ DE USUARIO                          │
+│                                                                 │
+│  [ImagePositionPicker]       [Botón Restaurar Fotos/Portada]    │
+└───────────────┬───────────────────────────────┬─────────────────┘
+                │ Solo envía                    │ Solicita revertir
+                │ "center-top", etc.            │ a catálogo original
+                ▼                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    CAPA CONTROLADORA (App.tsx)                  │
+│                                                                 │
+│  handleUpdateImagePosition()        handleRestoreOriginals()    │
+│  - Actualiza SOLO imagePosition     - Reconstruye catálogo      │
+│  - URLs quedan 100% intactas        - Sincroniza DB + Storage   │
+└───────────────┬───────────────────────────────┬─────────────────┘
+                │                               │
+                ▼                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│            BASE DE DATOS & PERSISTENCIA (InstantDB)             │
+│                                                                 │
+│  tx.images[uuid].update({           tx.images / tx.galleries    │
+│    imagePosition                     batch update con fotos     │
+│  })                                  originales y portadas      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Plan de Cambios Concretos
+1. **`src/services/instantDbService.ts`**:
+   - Crear función `restoreOriginalGalleryImages(galleryId?: string)` que reinserte de forma fidedigna las colecciones de fotos y portadas originales en InstantDB.
+   - Proteger `updateGalleryInDb` y `updateImageInDb` para que nunca acepten campos `url` o `coverImage` vacíos o sobreescritos.
+2. **`src/App.tsx`**:
+   - Implementar `handleRestoreGalleryOriginals(galleryId?: string)` y distribuirla al *AdminDashboard* y *GalleryView*.
+   - Corregir `handleBatchUpdateImagePosition` para que nunca mute el arreglo de imágenes local reemplazando URLs.
+3. **`src/components/AdminDashboard.tsx`**:
+   - Integrar botón de restauración de portada y fotos en las tarjetas de galería y en la tabla del inspector.
+   - En el modal de edición de galería (90vw × 90vh), agregar opción explícita para resetear la portada al valor original.
+4. **Verificación**:
+   - Ejecutar `compile_applet` para asegurar compilación limpia sin errores de tipos TypeScript.

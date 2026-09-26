@@ -8,7 +8,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { 
   GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig, AppNotification 
 } from './types';
-import { INITIAL_USERS } from './data/initialData';
+import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES } from './data/initialData';
 import { 
   loadUsersFromStorage, saveUsersToStorage,
   loadGalleriesFromStorage, saveGalleriesToStorage,
@@ -31,6 +31,7 @@ import {
   id,
   APP_ID,
   toUuid,
+  isSameId,
   seedInitialDataIfEmpty,
   createGalleryInDb,
   updateGalleryInDb,
@@ -43,6 +44,12 @@ import {
   deleteImagesBatchFromDb,
   toggleImageFavoriteInDb,
   updateImageInDb,
+  updateImagePositionInDb,
+  batchUpdateImagePositionsInDb,
+  updateGalleryCoverPositionInDb,
+  restoreDefaultImagesAndGalleriesInDb,
+  restoreGalleryCoverInDb,
+  restoreGalleryPhotosInDb,
   addFeedbackToDb,
   replyFeedbackInDb,
   batchOptimizeImagesInDb,
@@ -178,11 +185,12 @@ export default function App() {
   const galleries: GallerySession[] = useMemo(() => {
     if (dbData?.galleries && dbData.galleries.length > 0) {
       return (dbData.galleries as unknown as GallerySession[]).map(g => {
-        const local = localGalleries.find(l => l.id === g.id || toUuid(l.id) === toUuid(g.id));
+        const local = localGalleries.find(l => isSameId(l.id, g.id));
+        const initial = INITIAL_GALLERIES.find(ig => isSameId(ig.id, g.id));
         return {
           ...g,
-          coverImagePosition: local?.coverImagePosition || g.coverImagePosition || 'center',
-          coverImage: local?.coverImage || g.coverImage,
+          coverImage: g.coverImage || local?.coverImage || initial?.coverImage || '',
+          coverImagePosition: g.coverImagePosition || local?.coverImagePosition || initial?.coverImagePosition || 'center',
           clientIds: Array.isArray(g.clientIds) ? g.clientIds : (local?.clientIds || []),
           clientNames: Array.isArray(g.clientNames) ? g.clientNames : (local?.clientNames || []),
           feedbackList: Array.isArray(g.feedbackList) ? g.feedbackList : (local?.feedbackList || []),
@@ -195,10 +203,13 @@ export default function App() {
   const images: GalleryImage[] = useMemo(() => {
     if (dbData?.images && dbData.images.length > 0) {
       return (dbData.images as unknown as GalleryImage[]).map(img => {
-        const local = localImages.find(l => l.id === img.id || toUuid(l.id) === toUuid(img.id));
+        const local = localImages.find(l => isSameId(l.id, img.id));
+        const initial = INITIAL_IMAGES.find(ii => isSameId(ii.id, img.id));
         return {
           ...img,
-          imagePosition: local?.imagePosition || img.imagePosition || 'center',
+          url: img.url || local?.url || initial?.url || '',
+          highResUrl: img.highResUrl || local?.highResUrl || initial?.highResUrl || img.url || '',
+          imagePosition: img.imagePosition || local?.imagePosition || initial?.imagePosition || 'center',
           favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : (local?.favoriteByUsers || []),
           tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
         };
@@ -558,30 +569,40 @@ export default function App() {
 
   // Update Image metadata / retouch notes
   const handleUpdateImage = (updatedImage: GalleryImage) => {
+    if (!updatedImage || !updatedImage.id) return;
     setLocalImages(prev => {
-      const next = prev.map(img => (img.id === updatedImage.id || toUuid(img.id) === toUuid(updatedImage.id)) ? updatedImage : img);
+      const next = prev.map(img => isSameId(img.id, updatedImage.id) ? updatedImage : img);
       saveImagesToStorage(next);
       return next;
     });
-    updateImageInDb(updatedImage).catch(err => console.error('Error updating image in DB:', err));
-    addAuditLog('Foto Actualizada', `Se actualizaron notas o estado de retoque para "${updatedImage.title}".`);
+    // Use granular position update so the photo's url/highResUrl are never touched
+    updateImagePositionInDb(updatedImage.id, updatedImage.imagePosition || 'center')
+      .catch(() => updateImageInDb(updatedImage).catch(err => console.error('Error updating image in DB:', err)));
+    addAuditLog('Foto Actualizada', `Se actualizó el encuadre para "${updatedImage.title}".`);
   };
 
   // Batch update image framing / position for all images in a gallery
   const handleBatchUpdateImagePosition = (galleryId: string, position: string) => {
+    if (!galleryId) return;
+    const matchingIds = images
+      .filter(img => isSameId(img.galleryId, galleryId))
+      .map(img => img.id);
+
     setLocalImages(prev => {
       const next = prev.map(img => {
-        if (img.galleryId === galleryId || toUuid(img.galleryId) === toUuid(galleryId)) {
-          const updated = { ...img, imagePosition: position };
-          updateImageInDb(updated).catch(err => console.error('Error updating image in DB:', err));
-          return updated;
+        if (isSameId(img.galleryId, galleryId)) {
+          return { ...img, imagePosition: position };
         }
         return img;
       });
       saveImagesToStorage(next);
       return next;
     });
-    const gal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
+
+    // Granularly update ONLY imagePosition in InstantDB without touching photo URLs or other fields
+    batchUpdateImagePositionsInDb(matchingIds, position).catch(err => console.error('Error updating batch image positions in DB:', err));
+
+    const gal = galleries.find(g => isSameId(g.id, galleryId));
     addAuditLog('Encuadre Masivo Aplicado', `Se actualizó el encuadre a todas las fotos de la sesión "${gal?.title || 'Galería'}".`);
   };
 
@@ -709,6 +730,15 @@ export default function App() {
     });
     updateGalleryInDb(updatedGallery).catch(err => console.error('InstantDB update gallery error:', err));
     addAuditLog('Sesión Actualizada', `Modificó detalles y permisos de la sesión "${updatedGallery.title}".`, updatedGallery.title);
+  };
+
+  const handleUpdateGalleryCoverPosition = (galleryId: string, position: string) => {
+    setLocalGalleries(prev => {
+      const next = prev.map(g => (g.id === galleryId || toUuid(g.id) === toUuid(galleryId)) ? { ...g, coverImagePosition: position } : g);
+      saveGalleriesToStorage(next);
+      return next;
+    });
+    updateGalleryCoverPositionInDb(galleryId, position).catch(err => console.error('InstantDB update gallery cover position error:', err));
   };
 
   const handleDeleteGallery = (galleryId: string) => {
@@ -956,6 +986,7 @@ export default function App() {
             onToggleFavorite={handleToggleFavorite}
             onAddFeedback={handleAddFeedback}
             onUpdateGallery={handleUpdateGallery}
+            onUpdateGalleryCoverPosition={handleUpdateGalleryCoverPosition}
             onUpdateImage={handleUpdateImage}
             onBatchUpdateImagePosition={handleBatchUpdateImagePosition}
             onDeleteImage={handleDeleteImage}
@@ -992,6 +1023,7 @@ export default function App() {
             onOpenGallery={handleOpenGallery}
             onCreateGallery={handleCreateGallery}
             onUpdateGallery={handleUpdateGallery}
+            onUpdateGalleryCoverPosition={handleUpdateGalleryCoverPosition}
             onDeleteGallery={handleDeleteGallery}
             onCreateUser={handleCreateUser}
             onUpdateUser={handleUpdateUser}

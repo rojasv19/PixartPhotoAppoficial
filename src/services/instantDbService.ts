@@ -9,14 +9,18 @@ export { APP_ID, db, id };
  * for InstantDB compatibility.
  */
 export function toUuid(input: string): string {
-  if (!input) return '00000000-0000-4000-8000-000000000000';
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)) {
-    return input.toLowerCase();
+  if (!input || typeof input !== 'string' || input.trim() === '') {
+    // Generate a unique RFC UUID to strictly prevent empty/undefined inputs from colliding
+    return id();
+  }
+  const trimmed = input.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed.toLowerCase();
   }
   let hash1 = 0x811c9dc5;
   let hash2 = 0x5b79a7c3;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed.charCodeAt(i);
     hash1 = Math.imul(hash1 ^ char, 0x01000193);
     hash2 = Math.imul(hash2 ^ (char + i), 0x01000193);
   }
@@ -30,6 +34,19 @@ export function toUuid(input: string): string {
   const p4 = '8' + combined.slice(17, 20);
   const p5 = combined.slice(20, 32);
   return `${p1}-${p2}-${p3}-${p4}-${p5}`.toLowerCase();
+}
+
+/**
+ * Strict ID comparison helper: requires BOTH IDs to be valid non-empty strings.
+ * Never matches undefined, null or empty strings.
+ */
+export function isSameId(idA?: string | null, idB?: string | null): boolean {
+  if (!idA || !idB || typeof idA !== 'string' || typeof idB !== 'string') return false;
+  const a = idA.trim();
+  const b = idB.trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return toUuid(a) === toUuid(b);
 }
 
 /**
@@ -432,6 +449,44 @@ export async function updateImageInDb(image: GalleryImage) {
   ]);
 }
 
+/**
+ * Granularly updates ONLY the imagePosition of a single image.
+ * This guarantees the image's url, originalFileName, and highResUrl are NEVER touched or overwritten.
+ */
+export async function updateImagePositionInDb(imageId: string, imagePosition: string) {
+  const imageUuid = toUuid(imageId);
+  return db.transact([
+    tx.images[imageUuid].update({
+      imagePosition,
+    })
+  ]);
+}
+
+/**
+ * Granularly updates ONLY the imagePosition for multiple images in batch.
+ * Guarantees photo URLs are 100% untouched.
+ */
+export async function batchUpdateImagePositionsInDb(imageIds: string[], imagePosition: string) {
+  if (!imageIds || imageIds.length === 0) return;
+  const mutations = imageIds.map(id => 
+    tx.images[toUuid(id)].update({ imagePosition })
+  );
+  return db.transact(mutations);
+}
+
+/**
+ * Granularly updates ONLY the coverImagePosition of a gallery session.
+ * Guarantees coverImage URL is 100% untouched.
+ */
+export async function updateGalleryCoverPositionInDb(galleryId: string, coverImagePosition: string) {
+  const galleryUuid = toUuid(galleryId);
+  return db.transact([
+    tx.galleries[galleryUuid].update({
+      coverImagePosition,
+    })
+  ]);
+}
+
 export async function deleteImageFromDb(imageId: string) {
   return db.transact([tx.images[toUuid(imageId)].delete()]);
 }
@@ -545,4 +600,90 @@ export async function saveBrandingToDb(branding: StudioBrandingConfig) {
     })
   ]);
 }
+
+/**
+ * Restores original covers and photos in InstantDB across all galleries.
+ * Reconnects each photo with its legitimate high-resolution image URL.
+ */
+export async function restoreDefaultImagesAndGalleriesInDb() {
+  const transactions: any[] = [];
+
+  // 1. Restore original covers for predefined galleries
+  for (const g of INITIAL_GALLERIES) {
+    const galleryUuid = toUuid(g.id);
+    transactions.push(
+      tx.galleries[galleryUuid].update({
+        coverImage: g.coverImage,
+        coverImagePosition: g.coverImagePosition || 'center',
+      })
+    );
+  }
+
+  // 2. Restore all original photography images with their respective URLs and metadata
+  for (const img of INITIAL_IMAGES) {
+    const imageUuid = toUuid(img.id);
+    const galleryUuid = toUuid(img.galleryId);
+    transactions.push(
+      tx.images[imageUuid].update({
+        galleryId: galleryUuid,
+        title: img.title,
+        url: img.url,
+        highResUrl: img.highResUrl,
+        originalFileName: img.originalFileName,
+        fileSizeBytes: img.fileSizeBytes,
+        width: img.width,
+        height: img.height,
+        orientation: img.orientation,
+        cameraModel: img.cameraModel || '',
+        lens: img.lens || '',
+        tags: img.tags || [],
+        imagePosition: img.imagePosition || 'center',
+      })
+    );
+  }
+
+  return db.transact(transactions);
+}
+
+/**
+ * Restores the original cover photo and framing for a specific gallery.
+ */
+export async function restoreGalleryCoverInDb(galleryId: string) {
+  const original = INITIAL_GALLERIES.find(g => isSameId(g.id, galleryId));
+  if (!original) return;
+  return db.transact([
+    tx.galleries[toUuid(galleryId)].update({
+      coverImage: original.coverImage,
+      coverImagePosition: original.coverImagePosition || 'center',
+    })
+  ]);
+}
+
+/**
+ * Restores original photos for a specific gallery.
+ */
+export async function restoreGalleryPhotosInDb(galleryId: string) {
+  const originalPhotos = INITIAL_IMAGES.filter(img => isSameId(img.galleryId, galleryId));
+  if (originalPhotos.length === 0) return;
+
+  const mutations = originalPhotos.map(img =>
+    tx.images[toUuid(img.id)].update({
+      title: img.title,
+      url: img.url,
+      highResUrl: img.highResUrl,
+      originalFileName: img.originalFileName,
+      fileSizeBytes: img.fileSizeBytes,
+      width: img.width,
+      height: img.height,
+      orientation: img.orientation,
+      cameraModel: img.cameraModel || '',
+      lens: img.lens || '',
+      tags: img.tags || [],
+      imagePosition: img.imagePosition || 'center',
+    })
+  );
+
+  return db.transact(mutations);
+}
+
 

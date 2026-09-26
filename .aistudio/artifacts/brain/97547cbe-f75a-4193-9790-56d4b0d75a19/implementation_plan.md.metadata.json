@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para rediseñar el modal de crear/editar galería al 90vw x 90vh con scroll interno y datos visibles, corregir el corte/ocultamiento del selector de encuadre usando un portal flotante con z-index superior, y añadir control de encuadre en portadas de galería con opción de aplicar encuadre en lote a todas las fotos existentes.",
-  "updatedAt":  "2026-09-26T19:03:33.559770455Z",
+  "summary":  "Plan de acción para restaurar las fotos originales y portadas en todas las galerías del estudio, añadir la herramienta de restauración en el panel de administración, y blindar la base de datos para que el encuadre jamás modifique URLs o portadas.",
+  "updatedAt":  "2026-09-26T19:31:19.462666970Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
