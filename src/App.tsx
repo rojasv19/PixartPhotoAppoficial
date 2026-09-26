@@ -69,6 +69,24 @@ export default function App() {
   const [localLogs, setLocalLogs] = useState<AuditLogItem[]>(() => loadLogsFromStorage());
   const [hasSeeded, setHasSeeded] = useState(false);
 
+  // Track deleted user IDs so they never resurrect from demo data or remote cache
+  const [deletedUserIds, setDeletedUserIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('somos_pixart_deleted_users_v2');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('somos_pixart_deleted_users_v2', JSON.stringify(deletedUserIds));
+    } catch (e) {
+      console.warn('Notice: Could not save deletedUserIds:', e);
+    }
+  }, [deletedUserIds]);
+
   // Sync / Seed initial data to InstantDB on first mount
   useEffect(() => {
     // Proactively ensure defined admin users exist in InstantDB
@@ -98,24 +116,32 @@ export default function App() {
   // Robustly merge InstantDB data with local fallbacks and guarantee all predefined administrators exist
   const users: User[] = useMemo(() => {
     const userMap = new Map<string, User>();
+    const isDeleted = (idOrEmail: string) => {
+      const clean = idOrEmail.toLowerCase();
+      return deletedUserIds.some(d => d.toLowerCase() === clean);
+    };
 
-    // 1. Initial users as solid baseline (ensures Maurely Carmona and Victor Rojas always exist)
+    // 1. Initial staff/admin users baseline
     INITIAL_USERS.forEach(u => {
-      userMap.set(u.email.toLowerCase(), u);
+      if (u.role === 'admin' || !isDeleted(u.id) && !isDeleted(u.email)) {
+        userMap.set(u.email.toLowerCase(), u);
+      }
     });
 
-    // 2. Merge local storage users
+    // 2. Merge local storage users (excluding deleted)
     localUsers.forEach(u => {
       if (!u.email) return;
+      if (isDeleted(u.id) || isDeleted(u.email)) return;
       const email = u.email.toLowerCase();
       const existing = userMap.get(email);
       userMap.set(email, { ...(existing || {}), ...u });
     });
 
-    // 3. Merge InstantDB users
+    // 3. Merge InstantDB users (excluding deleted)
     if (dbData?.users && dbData.users.length > 0) {
       (dbData.users as unknown as User[]).forEach(u => {
         if (!u.email) return;
+        if (isDeleted(u.id) || isDeleted(u.email)) return;
         const email = u.email.toLowerCase();
         const base = userMap.get(email);
 
@@ -145,8 +171,9 @@ export default function App() {
       userMap.set('victor@somospixart.com', { ...(userMap.get('victor@somospixart.com') || {}), ...admin2 });
     }
 
-    return Array.from(userMap.values());
-  }, [dbData?.users, localUsers]);
+    // Filter out any user in deletedUserIds
+    return Array.from(userMap.values()).filter(u => !isDeleted(u.id) && !isDeleted(u.email));
+  }, [dbData?.users, localUsers, deletedUserIds]);
 
   const galleries: GallerySession[] = useMemo(() => {
     if (dbData?.galleries && dbData.galleries.length > 0) {
@@ -685,9 +712,13 @@ export default function App() {
   const handleDeleteUser = (userId: string) => {
     const targetUser = users.find(u => u.id === userId || toUuid(u.id) === toUuid(userId));
     const targetId = targetUser?.id || userId;
-    setLocalUsers(prev => prev.filter(u => u.id !== targetId && toUuid(u.id) !== toUuid(targetId)));
+    const targetEmail = targetUser?.email?.toLowerCase();
+
+    // Mark as deleted to prevent resurrection from demo data or remote cache
+    setDeletedUserIds(prev => Array.from(new Set([...prev, targetId, userId, ...(targetEmail ? [targetEmail] : [])])));
+    setLocalUsers(prev => prev.filter(u => u.id !== targetId && toUuid(u.id) !== toUuid(targetId) && u.email?.toLowerCase() !== targetEmail));
     deleteUserInDb(targetId).catch(err => console.error('InstantDB delete user error:', err));
-    addAuditLog('Cliente Eliminado', `Eliminó el acceso del cliente ${targetUser?.name}.`);
+    addAuditLog('Cliente Eliminado', `Eliminó el acceso del cliente ${targetUser?.name || 'Cliente'}.`);
   };
 
   // User Registration from Modal or Forms
@@ -711,7 +742,26 @@ export default function App() {
       setCurrentView('home');
     }
   };
-  const handleUploadImage = (galleryId: string, imageFile: { title: string; url: string; highResUrl: string; originalFileName: string; fileSizeBytes: number; width: number; height: number; tags: string[] }) => {
+
+  const handleUploadImage = (
+    galleryId: string, 
+    imageFile: { 
+      title: string; 
+      url: string; 
+      highResUrl: string; 
+      originalFileName: string; 
+      fileSizeBytes: number; 
+      width: number; 
+      height: number; 
+      tags: string[];
+      cameraModel?: string;
+      lens?: string;
+      focalLength?: string;
+      iso?: number;
+      shutterSpeed?: string;
+      aperture?: string;
+    }
+  ) => {
     const parentGal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
     const targetGalleryId = parentGal?.id || galleryId;
 
@@ -720,12 +770,12 @@ export default function App() {
       id: id(),
       galleryId: targetGalleryId,
       orientation: imageFile.width >= imageFile.height ? 'landscape' : 'portrait',
-      cameraModel: 'Canon EOS R5 Master',
-      lens: 'RF 50mm f/1.2L USM',
-      focalLength: '50mm',
-      iso: 100,
-      shutterSpeed: '1/1000s',
-      aperture: 'f/1.4',
+      cameraModel: imageFile.cameraModel || 'Cámara Digital (Sin EXIF)',
+      lens: imageFile.lens || 'Lente Profesional',
+      focalLength: imageFile.focalLength || '50mm',
+      iso: imageFile.iso || 100,
+      shutterSpeed: imageFile.shutterSpeed || '1/500s',
+      aperture: imageFile.aperture || 'f/2.8',
       favoriteByUsers: [],
       uploadedAt: new Date().toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
       optimized: false,
@@ -734,7 +784,7 @@ export default function App() {
     setLocalImages(prev => [newImage, ...prev]);
     uploadImageToDb(newImage).catch(err => console.error('InstantDB upload image error:', err));
 
-    addAuditLog('Carga de Fotografía', `Subió la foto "${newImage.title}" (${(newImage.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB) a la galería.`, parentGal?.title);
+    addAuditLog('Carga de Fotografía', `Subió la foto "${newImage.title}" (${(newImage.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB) [${newImage.cameraModel}] a la galería.`, parentGal?.title);
 
     // Notification for clients/users
     handleAddNotification({

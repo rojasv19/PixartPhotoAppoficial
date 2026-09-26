@@ -152,30 +152,42 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28 pb-16 text-center space-y-6 flex flex-col items-center justify-center my-auto">
           
-          <div 
-            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}
-            style={typographyToStyle(branding?.customTypographyMap?.portalHeroBadge)}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>{branding?.portalHeroBadge || 'Somos Pixart • Plataforma Fotográfica'}</span>
-          </div>
+          {/* Badge (only rendered if present) */}
+          {branding?.portalHeroBadge && branding.portalHeroBadge.trim().length > 0 && (
+            <div 
+              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${colorTheme.twBadgeBg} ${colorTheme.twBadgeBorder} ${colorTheme.twBadgeText}`}
+              style={typographyToStyle(branding?.customTypographyMap?.portalHeroBadge)}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{branding.portalHeroBadge}</span>
+            </div>
+          )}
 
-          <h1 
-            className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-serif-display leading-tight max-w-4xl mx-auto drop-shadow-md text-white"
-            style={typographyToStyle(branding?.customTypographyMap?.portalHeroTitle || branding?.customTypographyMap?.globalHeading)}
-          >
-            {branding?.portalHeroTitle || 'Galerías fotográficas privadas en'}{' '}
-            <span className={`${colorTheme.twText} italic drop-shadow-md`}>
-              {branding?.portalHeroHighlight || 'máxima resolución.'}
-            </span>
-          </h1>
+          {/* Main Title & Highlight (only rendered if at least one has content) */}
+          {((branding?.portalHeroTitle && branding.portalHeroTitle.trim().length > 0) || 
+            (branding?.portalHeroHighlight && branding.portalHeroHighlight.trim().length > 0)) && (
+            <h1 
+              className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight font-serif-display leading-tight max-w-4xl mx-auto drop-shadow-md text-white"
+              style={typographyToStyle(branding?.customTypographyMap?.portalHeroTitle || branding?.customTypographyMap?.globalHeading)}
+            >
+              {branding?.portalHeroTitle && <span>{branding.portalHeroTitle} </span>}
+              {branding?.portalHeroHighlight && branding.portalHeroHighlight.trim().length > 0 && (
+                <span className={`${colorTheme.twText} italic drop-shadow-md`}>
+                  {branding.portalHeroHighlight}
+                </span>
+              )}
+            </h1>
+          )}
 
-          <p 
-            className="text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-slate-200 drop-shadow-sm font-medium"
-            style={typographyToStyle(branding?.customTypographyMap?.portalHeroSubtitle)}
-          >
-            {branding?.portalHeroSubtitle || 'Visualización, selección de favoritas y descarga directa en alta fidelidad RAW y 4K con almacenamiento seguro.'}
-          </p>
+          {/* Subtitle (only rendered if present) */}
+          {branding?.portalHeroSubtitle && branding.portalHeroSubtitle.trim().length > 0 && (
+            <p 
+              className="text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-slate-200 drop-shadow-sm font-medium"
+              style={typographyToStyle(branding?.customTypographyMap?.portalHeroSubtitle)}
+            >
+              {branding.portalHeroSubtitle}
+            </p>
+          )}
 
           {/* Clean Quick Search input */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md mx-auto">

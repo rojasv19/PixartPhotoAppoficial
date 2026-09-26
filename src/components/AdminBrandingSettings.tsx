@@ -6,7 +6,7 @@ import {
   ExternalLink, Mail, Phone, MapPin, Instagram, Globe, HelpCircle,
   Copy, ArrowRight, ShieldCheck, Lock, Download, MessageSquare,
   Upload, Trash2, FileImage, Video, Play, SlidersHorizontal,
-  Key, Users, HardDrive, FolderPlus, UserPlus, ShieldAlert, Sparkle, Info, X
+  Key, Users, HardDrive, FolderPlus, UserPlus, ShieldAlert, Sparkle, Info, X, Search
 } from 'lucide-react';
 import { StudioBrandingConfig, BrandIconName, ColorPreset, ModalTextsConfig, TypographyStyle } from '../types';
 import { COLOR_PRESET_MAP, DEFAULT_BRANDING, DEFAULT_MODAL_TEXTS } from '../services/brandingService';
@@ -485,59 +485,64 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               </div>
             </div>
 
-            {/* Mock Hero Content Preview */}
-            <div className="p-6 sm:p-8 text-center space-y-3 relative z-10">
-              <div 
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${activeColorTheme.twBadgeBg} ${activeColorTheme.twBadgeBorder} ${activeColorTheme.twBadgeText}`}
-                style={typographyToStyle(formData.customTypographyMap?.portalHeroBadge)}
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>{formData.portalHeroBadge}</span>
-              </div>
+            {/* Subtle Background Pattern matching actual hero */}
+            <div className="absolute inset-0 z-0 opacity-15 pointer-events-none">
+              <div className="absolute inset-0 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:24px_24px]" />
+            </div>
 
-              <h3 
-                className="text-lg sm:text-2xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-sm text-white"
-                style={typographyToStyle(formData.customTypographyMap?.portalHeroTitle || formData.customTypographyMap?.globalHeading)}
-              >
-                {formData.portalHeroTitle}{' '}
-                <span className={`${activeColorTheme.twText} italic drop-shadow-sm`}>
-                  {formData.portalHeroHighlight}
-                </span>
-              </h3>
+            {/* Smooth bottom gradient blend matching actual hero */}
+            <div 
+              className={`absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t pointer-events-none ${
+                isDark ? 'from-[#0F1012] via-[#0F1012]/80 to-transparent' : 'from-[#F8F9FA] via-[#F8F9FA]/80 to-transparent'
+              }`} 
+            />
 
-              <p 
-                className="text-xs text-slate-200 max-w-md mx-auto line-clamp-2 drop-shadow-xs"
-                style={typographyToStyle(formData.customTypographyMap?.portalHeroSubtitle)}
-              >
-                {formData.portalHeroSubtitle}
-              </p>
-
-              {/* Mock Access Cards preview */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 text-left max-w-lg mx-auto">
-                <div className={`p-3 rounded-2xl border text-xs space-y-1.5 backdrop-blur-md ${
-                  isDark ? 'bg-slate-900/85 border-slate-700/80' : 'bg-white/90 border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${activeColorTheme.twBadgeBg} ${activeColorTheme.twText}`}>
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <span className="text-[9px] text-slate-400 font-mono-code">{formData.adminCardBadge}</span>
-                  </div>
-                  <div className={`font-bold text-[11px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{formData.adminCardTitle}</div>
-                  <div className="text-[10px] text-slate-400 line-clamp-2">{formData.adminCardDescription}</div>
+            {/* Actual Hero Content Preview (1:1 with PublicClientPortal, centered dynamically) */}
+            <div className="px-6 py-10 sm:py-14 text-center space-y-4 relative z-10 flex flex-col items-center justify-center min-h-[220px]">
+              {/* Badge (only rendered if text is present) */}
+              {formData.portalHeroBadge && formData.portalHeroBadge.trim().length > 0 && (
+                <div 
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md shadow-md ${activeColorTheme.twBadgeBg} ${activeColorTheme.twBadgeBorder} ${activeColorTheme.twBadgeText}`}
+                  style={typographyToStyle(formData.customTypographyMap?.portalHeroBadge)}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>{formData.portalHeroBadge}</span>
                 </div>
+              )}
 
-                <div className={`p-3 rounded-2xl border text-xs space-y-1.5 backdrop-blur-md ${
-                  isDark ? 'bg-slate-900/85 border-slate-700/80' : 'bg-white/90 border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${activeColorTheme.twBadgeBg} ${activeColorTheme.twText}`}>
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <span className="text-[9px] text-slate-400 font-mono-code">{formData.clientCardBadge}</span>
+              {/* Title & Highlight (only rendered if at least one has content) */}
+              {((formData.portalHeroTitle && formData.portalHeroTitle.trim().length > 0) || 
+                (formData.portalHeroHighlight && formData.portalHeroHighlight.trim().length > 0)) && (
+                <h3 
+                  className="text-xl sm:text-3xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-sm text-white"
+                  style={typographyToStyle(formData.customTypographyMap?.portalHeroTitle || formData.customTypographyMap?.globalHeading)}
+                >
+                  {formData.portalHeroTitle && <span>{formData.portalHeroTitle} </span>}
+                  {formData.portalHeroHighlight && formData.portalHeroHighlight.trim().length > 0 && (
+                    <span className={`${activeColorTheme.twText} italic drop-shadow-sm`}>
+                      {formData.portalHeroHighlight}
+                    </span>
+                  )}
+                </h3>
+              )}
+
+              {/* Subtitle (only rendered if text is present) */}
+              {formData.portalHeroSubtitle && formData.portalHeroSubtitle.trim().length > 0 && (
+                <p 
+                  className="text-xs sm:text-sm text-slate-200 max-w-lg mx-auto leading-relaxed drop-shadow-xs font-medium"
+                  style={typographyToStyle(formData.customTypographyMap?.portalHeroSubtitle)}
+                >
+                  {formData.portalHeroSubtitle}
+                </p>
+              )}
+
+              {/* Quick Search bar matching real hero */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm mx-auto">
+                <div className="relative w-full">
+                  <div className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl pl-9 pr-4 py-2 text-[11px] text-white/70 shadow-lg flex items-center justify-between pointer-events-none">
+                    <span className="text-slate-400">Buscar sesión, locación o evento...</span>
+                    <Search className="w-3.5 h-3.5 text-slate-400" />
                   </div>
-                  <div className={`font-bold text-[11px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{formData.clientCardTitle}</div>
-                  <div className="text-[10px] text-slate-400 line-clamp-2">{formData.clientCardDescription}</div>
                 </div>
               </div>
             </div>

@@ -422,7 +422,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                     <Camera className="w-3.5 h-3.5 text-slate-500" />
                     Cámara
                   </span>
-                  <span className="text-slate-200 font-medium">{image.cameraModel || 'Canon Pro System'}</span>
+                  <span className="text-slate-200 font-medium">{image.cameraModel || 'No disponible'}</span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs">
@@ -430,25 +430,25 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                     <Sliders className="w-3.5 h-3.5 text-slate-500" />
                     Objetivo
                   </span>
-                  <span className="text-slate-200 font-medium">{image.lens || 'Prime Master Lens'}</span>
+                  <span className="text-slate-200 font-medium">{image.lens || 'Lente Profesional'}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-400 block">Distancia Focal</span>
-                    <span className="text-slate-200 font-mono-code">{image.focalLength || '50mm'}</span>
+                    <span className="text-slate-200 font-mono-code">{image.focalLength || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block">Apertura</span>
-                    <span className="text-slate-200 font-mono-code">{image.aperture || 'f/1.8'}</span>
+                    <span className="text-slate-200 font-mono-code">{image.aperture || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block">Velocidad</span>
-                    <span className="text-slate-200 font-mono-code">{image.shutterSpeed || '1/1000s'}</span>
+                    <span className="text-slate-200 font-mono-code">{image.shutterSpeed || '—'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block">Sensibilidad ISO</span>
-                    <span className="text-slate-200 font-mono-code">ISO {image.iso || 100}</span>
+                    <span className="text-slate-200 font-mono-code">{image.iso ? `ISO ${image.iso}` : '—'}</span>
                   </div>
                 </div>
               </div>

@@ -13,6 +13,7 @@ import { AdminBrandingSettings } from './AdminBrandingSettings';
 import { AdminFavoritesView } from './AdminFavoritesView';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
+import { extractExifFromFile } from '../services/exifService';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -31,7 +32,22 @@ interface AdminDashboardProps {
   onCreateUser: (newUser: Omit<User, 'id' | 'createdDate'>) => void;
   onUpdateUser: (updatedUser: User) => void;
   onDeleteUser: (userId: string) => void;
-  onUploadImage: (galleryId: string, imageFile: { title: string; url: string; highResUrl: string; originalFileName: string; fileSizeBytes: number; width: number; height: number; tags: string[] }) => void;
+  onUploadImage: (galleryId: string, imageFile: { 
+    title: string; 
+    url: string; 
+    highResUrl: string; 
+    originalFileName: string; 
+    fileSizeBytes: number; 
+    width: number; 
+    height: number; 
+    tags: string[];
+    cameraModel?: string;
+    lens?: string;
+    focalLength?: string;
+    iso?: number;
+    shutterSpeed?: string;
+    aperture?: string;
+  }) => void;
   onDeleteImage: (imageId: string) => void;
   onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
@@ -229,10 +245,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     previewUrl: string;
     width: number;
     height: number;
+    cameraModel?: string;
+    lens?: string;
+    focalLength?: string;
+    iso?: number;
+    shutterSpeed?: string;
+    aperture?: string;
   }>>([]);
   const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
+
+  // Client Deletion Confirmation Modal State
+  const [clientToDelete, setClientToDelete] = useState<User | null>(null);
 
   // Photo Deletion & Filter States
   const [galleryToEmptyPhotos, setGalleryToEmptyPhotos] = useState<GallerySession | null>(null);
@@ -546,7 +571,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const results = await Promise.all(
         fileList.map(async (file) => {
-          const processed = await processImageFile(file);
+          const [processed, exif] = await Promise.all([
+            processImageFile(file),
+            extractExifFromFile(file)
+          ]);
           const originalName = file.name;
           const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
           return {
@@ -556,8 +584,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             fileSizeBytes: file.size,
             sizeFormatted: formatBytes(file.size),
             previewUrl: processed.thumbnailUrl,
-            width: processed.width,
-            height: processed.height,
+            width: exif.width || processed.width,
+            height: exif.height || processed.height,
+            cameraModel: exif.cameraModel,
+            lens: exif.lens,
+            focalLength: exif.focalLength,
+            iso: exif.iso,
+            shutterSpeed: exif.shutterSpeed,
+            aperture: exif.aperture,
           };
         })
       );
@@ -598,6 +632,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           width: item.width,
           height: item.height,
           tags: ['RAW', 'Alta Resolución'],
+          cameraModel: item.cameraModel,
+          lens: item.lens,
+          focalLength: item.focalLength,
+          iso: item.iso,
+          shutterSpeed: item.shutterSpeed,
+          aperture: item.aperture,
         });
       });
     } catch (err) {
@@ -1626,11 +1666,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <button
                         id={`delete-client-btn-${client.id}`}
-                        onClick={() => {
-                          if (confirm(`¿Deseas eliminar al cliente ${client.name}?`)) {
-                            onDeleteUser(client.id);
-                          }
-                        }}
+                        onClick={() => setClientToDelete(client)}
                         className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                           isDark ? 'text-stone-500 hover:text-rose-400 hover:bg-stone-800' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
                         }`}
@@ -3384,6 +3420,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <span>{item.width} × {item.height} px</span>
                               </span>
 
+                              {/* Real Camera Detected Badge */}
+                              {item.cameraModel ? (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                                  isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}>
+                                  <span>📷 {item.cameraModel}</span>
+                                </span>
+                              ) : null}
+
                               <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400">
                                 {item.name.split('.').pop() || 'IMG'}
                               </span>
@@ -3829,6 +3874,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Sí, Eliminar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal: Delete Client Account */}
+      {clientToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 select-none">
+          <div className={`w-full max-w-md rounded-3xl border p-6 sm:p-7 shadow-2xl space-y-5 ${
+            isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  ¿Eliminar cliente permanentemente?
+                </h3>
+                <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  Se revocará su acceso privado y no podrá ingresar a sus sesiones ni enviar selecciones de favoritas.
+                </p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl border space-y-2 text-xs ${
+              isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Nombre:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{clientToDelete.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Email de acceso:</span>
+                <span className="font-mono-code font-semibold text-slate-800 dark:text-stone-200">{clientToDelete.email}</span>
+              </div>
+              {clientToDelete.assignedGalleryIds && clientToDelete.assignedGalleryIds.length > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className={isDark ? 'text-stone-400' : 'text-slate-500'}>Galerías asignadas:</span>
+                  <span className="font-semibold text-amber-500">{clientToDelete.assignedGalleryIds.length} sesión(es)</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-stone-800">
+              <button
+                type="button"
+                id="cancel-delete-client-modal-btn"
+                onClick={() => setClientToDelete(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isDark ? 'bg-stone-800 hover:bg-stone-700 text-stone-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="confirm-delete-client-modal-btn"
+                onClick={() => {
+                  onDeleteUser(clientToDelete.id);
+                  setClientToDelete(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20 cursor-pointer transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmar y Eliminar</span>
               </button>
             </div>
           </div>
