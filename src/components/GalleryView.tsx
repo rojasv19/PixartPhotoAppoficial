@@ -25,6 +25,7 @@ interface GalleryViewProps {
   onAddFeedback: (galleryId: string, feedback: Omit<FeedbackItem, 'id' | 'createdAt'>) => void;
   onUpdateGallery?: (updatedGallery: GallerySession) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
+  onBatchUpdateImagePosition?: (galleryId: string, position: string) => void;
   onDeleteImage?: (imageId: string) => void;
   onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onRequestLogin: () => void;
@@ -41,6 +42,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onAddFeedback,
   onUpdateGallery,
   onUpdateImage,
+  onBatchUpdateImagePosition,
   onDeleteImage,
   onDeleteAllImagesInGallery,
   onRequestLogin,
@@ -394,20 +396,35 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <span className="font-mono-code">{formatBytes(totalGalleryBytes)} en Servidor</span>
               </div>
 
-              {currentUser?.role === 'admin' && onUpdateGallery && (
-                <div className="ml-auto">
-                  <ImagePositionPicker
-                    value={gallery.coverImagePosition || 'center'}
-                    onChange={(newPos) => {
-                      onUpdateGallery({
-                        ...gallery,
-                        coverImagePosition: newPos,
-                      });
-                    }}
-                    previewImageUrl={gallery.coverImage}
-                    label="Encuadre Portada"
-                    theme={theme}
-                  />
+              {currentUser?.role === 'admin' && (
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {onUpdateGallery && (
+                    <ImagePositionPicker
+                      value={gallery.coverImagePosition || 'center'}
+                      onChange={(newPos) => {
+                        onUpdateGallery({
+                          ...gallery,
+                          coverImagePosition: newPos,
+                        });
+                      }}
+                      onApplyToAll={onBatchUpdateImagePosition ? (newPos) => onBatchUpdateImagePosition(gallery.id, newPos) : undefined}
+                      previewImageUrl={gallery.coverImage}
+                      label="Encuadre Portada"
+                      theme={theme}
+                    />
+                  )}
+
+                  {onBatchUpdateImagePosition && images.length > 0 && (
+                    <ImagePositionPicker
+                      value={images[0]?.imagePosition || 'center'}
+                      onChange={(newPos) => {
+                        onBatchUpdateImagePosition(gallery.id, newPos);
+                      }}
+                      label="Alinear Todas las Fotos"
+                      compact={false}
+                      theme={theme}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -745,6 +762,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                           onChange={(newPos) => {
                             onUpdateImage({ ...image, imagePosition: newPos });
                           }}
+                          onApplyToAll={onBatchUpdateImagePosition ? (pos) => onBatchUpdateImagePosition(gallery.id, pos) : undefined}
                           previewImageUrl={image.url}
                           label="Encuadre"
                           theme={theme}

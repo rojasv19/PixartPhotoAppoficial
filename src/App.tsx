@@ -554,6 +554,20 @@ export default function App() {
     addAuditLog('Foto Actualizada', `Se actualizaron notas o estado de retoque para "${updatedImage.title}".`);
   };
 
+  // Batch update image framing / position for all images in a gallery
+  const handleBatchUpdateImagePosition = (galleryId: string, position: string) => {
+    setLocalImages(prev => prev.map(img => {
+      if (img.galleryId === galleryId || toUuid(img.galleryId) === toUuid(galleryId)) {
+        const updated = { ...img, imagePosition: position };
+        updateImageInDb(updated).catch(err => console.error('Error updating image in DB:', err));
+        return updated;
+      }
+      return img;
+    }));
+    const gal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
+    addAuditLog('Encuadre Masivo Aplicado', `Se actualizó el encuadre a todas las fotos de la sesión "${gal?.title || 'Galería'}".`);
+  };
+
   // Feedback Submission
   const handleAddFeedback = (galleryId: string, feedbackData: Omit<FeedbackItem, 'id' | 'createdAt'>) => {
     const newFeedback: FeedbackItem = {
@@ -922,6 +936,7 @@ export default function App() {
             onAddFeedback={handleAddFeedback}
             onUpdateGallery={handleUpdateGallery}
             onUpdateImage={handleUpdateImage}
+            onBatchUpdateImagePosition={handleBatchUpdateImagePosition}
             onDeleteImage={handleDeleteImage}
             onDeleteAllImagesInGallery={handleDeleteAllImagesInGallery}
             onRequestLogin={() => {
@@ -966,6 +981,7 @@ export default function App() {
             onBatchOptimizeImages={handleBatchOptimizeImages}
             onReplyFeedback={handleReplyFeedback}
             onUpdateImage={handleUpdateImage}
+            onBatchUpdateImagePosition={handleBatchUpdateImagePosition}
             onUpdateServerQuota={handleUpdateServerQuota}
             theme={theme}
           />

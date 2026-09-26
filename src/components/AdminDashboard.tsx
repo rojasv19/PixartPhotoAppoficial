@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ImageIcon, Users, HardDrive, ShieldCheck, Plus, 
   Trash2, Edit3, Key, Check, Eye, Download, MessageSquare, Star, 
   Sparkles, Search, Filter, ArrowUpRight, CheckCircle2, AlertTriangle, 
-  Upload, Sliders, Calendar, MapPin, Lock, FileText, Activity, Shield, RefreshCw, X, Camera, Palette, Heart
+  Upload, Sliders, Calendar, MapPin, Lock, FileText, Activity, Shield, RefreshCw, X, Camera, Palette, Heart, Save
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig, TypographyStyle } from '../types';
 import { formatBytes, calculateServerStats, downloadSingleImage } from '../services/storageService';
@@ -14,7 +14,7 @@ import { AdminFavoritesView } from './AdminFavoritesView';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
 import { extractExifFromFile } from '../services/exifService';
-import { ImagePositionPicker, getImagePositionStyle } from './ImagePositionPicker';
+import { ImagePositionPicker, getImagePositionStyle, getImagePositionLabel } from './ImagePositionPicker';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -52,6 +52,7 @@ interface AdminDashboardProps {
   onDeleteImage: (imageId: string) => void;
   onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
+  onBatchUpdateImagePosition?: (galleryId: string, position: string) => void;
   onBatchOptimizeImages: () => void;
   onReplyFeedback: (galleryId: string, feedbackId: string, replyText: string) => void;
   onUpdateServerQuota?: (newQuotaBytes: number) => void;
@@ -81,6 +82,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBatchOptimizeImages,
   onReplyFeedback,
   onUpdateImage,
+  onBatchUpdateImagePosition,
   onUpdateServerQuota,
   theme = 'dark',
 }) => {
@@ -235,6 +237,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDirectGalleryCoverPositionChange = (galleryId: string, position: string) => {
+    const targetGallery = galleries.find(g => g.id === galleryId);
+    if (targetGallery) {
+      onUpdateGallery({
+        ...targetGallery,
+        coverImagePosition: position,
+      });
+    }
   };
 
   // Multiple Real File Upload State
@@ -1342,6 +1354,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   src={gal.coverImage} 
                                   alt={gal.title} 
                                   className="w-full h-full object-cover group-hover/cover:scale-105 transition-transform"
+                                  style={{
+                                    objectPosition: getImagePositionStyle(gal.coverImagePosition),
+                                  }}
                                 />
                                 <label 
                                   title="Cambiar portada desde dispositivo"
@@ -1428,6 +1443,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           {/* Actions */}
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Framing tool for cover + batch apply option */}
+                              <ImagePositionPicker
+                                value={gal.coverImagePosition || 'center'}
+                                onChange={(pos) => handleDirectGalleryCoverPositionChange(gal.id, pos)}
+                                onApplyToAll={onBatchUpdateImagePosition ? (pos) => onBatchUpdateImagePosition(gal.id, pos) : undefined}
+                                previewImageUrl={gal.coverImage}
+                                compact={true}
+                                label="Encuadre"
+                                theme={theme}
+                              />
+
                               {/* Open client view */}
                               <button
                                 id={`view-gal-btn-${gal.id}`}
@@ -1864,6 +1890,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </select>
                   </div>
 
+                  {/* Batch alignment for selected session */}
+                  {photoFilterGalleryId !== 'all' && onBatchUpdateImagePosition && (
+                    <ImagePositionPicker
+                      value={filteredInspectorImages[0]?.imagePosition || 'center'}
+                      onChange={(pos) => onBatchUpdateImagePosition(photoFilterGalleryId, pos)}
+                      label="Encuadre de esta sesión"
+                      compact={false}
+                      theme={theme}
+                    />
+                  )}
+
                   {/* Batch delete photos button */}
                   {filteredInspectorImages.length > 0 && onDeleteAllImagesInGallery && (
                     <button
@@ -2022,6 +2059,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       imagePosition: newPos,
                                     });
                                   }}
+                                  onApplyToAll={onBatchUpdateImagePosition ? (pos) => onBatchUpdateImagePosition(img.galleryId, pos) : undefined}
                                   previewImageUrl={img.url}
                                   label="Alinear"
                                   theme={theme}
@@ -2288,28 +2326,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       </div>
 
-      {/* MODAL: NEW / EDIT GALLERY */}
+      {/* MODAL: NEW / EDIT GALLERY (90vw x 90vh with fixed header & footer and scrollable body) */}
       {showNewGalleryModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 select-none animate-in fade-in duration-200">
           <div 
             id="new-gallery-modal-dialog"
-            className={`w-full max-w-2xl border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 my-8 ${
-              isDark ? 'bg-stone-900 border-stone-800' : 'bg-white border-slate-200'
+            className={`w-[90vw] max-w-[90vw] h-[90vh] max-h-[90vh] flex flex-col border rounded-3xl shadow-2xl overflow-hidden ${
+              isDark ? 'bg-stone-900 border-stone-800 text-stone-100' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className={`flex items-center justify-between border-b pb-4 ${
-              isDark ? 'border-stone-800' : 'border-slate-100'
+            {/* Fixed Header */}
+            <div className={`px-6 sm:px-8 py-4 sm:py-5 border-b shrink-0 flex items-center justify-between ${
+              isDark ? 'border-stone-800 bg-stone-900/90' : 'border-slate-100 bg-white/90'
             }`}>
               <div>
-                <h3 className={`text-xl font-bold font-serif-display ${
-                  isDark ? 'text-stone-100' : 'text-slate-900'
-                }`}>
-                  {editingGallery 
-                    ? (galleryModalTexts.titleEdit || 'Editar Sesión Fotográfica') 
-                    : (galleryModalTexts.titleNew || 'Configurar Nueva Sesión Fotográfica')}
-                </h3>
-                <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                  Ingresa los detalles del evento, fecha, ubicación y credenciales.
+                <div className="flex items-center gap-2.5">
+                  <h3 className={`text-xl font-bold font-serif-display ${
+                    isDark ? 'text-stone-100' : 'text-slate-900'
+                  }`}>
+                    {editingGallery 
+                      ? (galleryModalTexts.titleEdit || 'Editar Sesión Fotográfica') 
+                      : (galleryModalTexts.titleNew || 'Configurar Nueva Sesión Fotográfica')}
+                  </h3>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    editingGallery ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {editingGallery ? 'Edición' : 'Nueva'}
+                  </span>
+                </div>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                  Configura los detalles del evento, encuadre de la portada, asignación de clientes y protección de marca.
                 </p>
               </div>
               <button 
@@ -2323,195 +2369,294 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveGallery} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveGallery} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-6">
                 
-                {/* Title */}
-                <div className="sm:col-span-2 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      {galleryModalTexts.titleLabel || 'Título del Evento / Sesión:'}
-                    </label>
-                    <TypographyControl
-                      label="Tipografía del Título"
-                      value={galleryTitleTypography}
-                      onChange={setGalleryTitleTypography}
-                      sampleText={galleryTitle || 'Camila & David — Boda'}
-                      theme={theme}
-                    />
-                  </div>
-                  <input
-                    id="input-gallery-title"
-                    type="text"
-                    required
-                    value={galleryTitle}
-                    onChange={(e) => setGalleryTitle(e.target.value)}
-                    placeholder={galleryModalTexts.titlePlaceholder || 'Ej. Camila & David — Boda en Hacienda Real'}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                {/* 2-Column Responsive Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                  
+                  {/* LEFT COLUMN: Session Information & Permissions */}
+                  <div className="space-y-6">
+                    
+                    {/* Basic Info Card */}
+                    <div className={`p-5 rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <h4 className={`text-xs uppercase font-bold tracking-wider ${isDark ? 'text-amber-400' : colorTheme.twText}`}>
+                        Información Principal de la Sesión
+                      </h4>
 
-                {/* Subtitle / Descripción Corta */}
-                <div className="sm:col-span-2 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      Subtítulo o Frase de la Sesión:
-                    </label>
-                    <TypographyControl
-                      label="Tipografía del Subtítulo"
-                      value={gallerySubtitleTypography}
-                      onChange={setGallerySubtitleTypography}
-                      sampleText={gallerySubtitle || 'Celebración inolvidable bajo el atardecer'}
-                      theme={theme}
-                    />
-                  </div>
-                  <input
-                    id="input-gallery-subtitle"
-                    type="text"
-                    value={gallerySubtitle}
-                    onChange={(e) => setGallerySubtitle(e.target.value)}
-                    placeholder="Ej. Celebración inolvidable bajo la luz del atardecer"
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                      {/* Title */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            {galleryModalTexts.titleLabel || 'Título del Evento / Sesión:'}
+                          </label>
+                          <TypographyControl
+                            label="Tipografía del Título"
+                            value={galleryTitleTypography}
+                            onChange={setGalleryTitleTypography}
+                            sampleText={galleryTitle || 'Camila & David — Boda'}
+                            theme={theme}
+                          />
+                        </div>
+                        <input
+                          id="input-gallery-title"
+                          type="text"
+                          required
+                          value={galleryTitle}
+                          onChange={(e) => setGalleryTitle(e.target.value)}
+                          placeholder={galleryModalTexts.titlePlaceholder || 'Ej. Camila & David — Boda en Hacienda Real'}
+                          className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                            isDark 
+                              ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
+                              : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
+                          }`}
+                        />
+                      </div>
 
-                {/* Category */}
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {galleryModalTexts.categoryLabel || 'Categoría de Fotografía:'}
-                  </label>
-                  <select
-                    id="select-gallery-category"
-                    value={galleryCategory}
-                    onChange={(e) => setGalleryCategory(e.target.value as any)}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
-                    }`}
-                  >
-                    <option value="boda">💍 Boda / Enlace Nupcial</option>
-                    <option value="editorial">✨ Moda Editorial & Alta Costura</option>
-                    <option value="retrato">👤 Retrato de Autor & Personal Branding</option>
-                    <option value="corporativo">🏢 Corporativo & Eventos de Empresa</option>
-                    <option value="arquitectura">🏛️ Arquitectura & Espacios</option>
-                    <option value="familia">👶 Familia & Maternidad</option>
-                  </select>
-                </div>
+                      {/* Subtitle */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            Subtítulo o Frase de la Sesión:
+                          </label>
+                          <TypographyControl
+                            label="Tipografía del Subtítulo"
+                            value={gallerySubtitleTypography}
+                            onChange={setGallerySubtitleTypography}
+                            sampleText={gallerySubtitle || 'Celebración inolvidable bajo el atardecer'}
+                            theme={theme}
+                          />
+                        </div>
+                        <input
+                          id="input-gallery-subtitle"
+                          type="text"
+                          value={gallerySubtitle}
+                          onChange={(e) => setGallerySubtitle(e.target.value)}
+                          placeholder="Ej. Celebración inolvidable bajo la luz del atardecer"
+                          className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                            isDark 
+                              ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
+                              : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
+                          }`}
+                        />
+                      </div>
 
-                {/* Event Date */}
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {galleryModalTexts.dateLabel || 'Fecha del Evento:'}
-                  </label>
-                  <input
-                    id="input-gallery-date"
-                    type="date"
-                    required
-                    value={galleryDate}
-                    onChange={(e) => setGalleryDate(e.target.value)}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                      {/* Category & Date Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            {galleryModalTexts.categoryLabel || 'Categoría de Fotografía:'}
+                          </label>
+                          <select
+                            id="select-gallery-category"
+                            value={galleryCategory}
+                            onChange={(e) => setGalleryCategory(e.target.value as any)}
+                            className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                              isDark 
+                                ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
+                                : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
+                            }`}
+                          >
+                            <option value="boda">💍 Boda / Enlace Nupcial</option>
+                            <option value="editorial">✨ Moda Editorial & Alta Costura</option>
+                            <option value="retrato">👤 Retrato de Autor & Personal Branding</option>
+                            <option value="corporativo">🏢 Corporativo & Eventos de Empresa</option>
+                            <option value="arquitectura">🏛️ Arquitectura & Espacios</option>
+                            <option value="familia">👶 Familia & Maternidad</option>
+                          </select>
+                        </div>
 
-                {/* Location */}
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {galleryModalTexts.locationLabel || 'Ciudad / Región:'}
-                  </label>
-                  <input
-                    id="input-gallery-location"
-                    type="text"
-                    required
-                    value={galleryLocation}
-                    onChange={(e) => setGalleryLocation(e.target.value)}
-                    placeholder={galleryModalTexts.locationPlaceholder || 'Ej. Madrid / Palacio de Cristal'}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                        <div className="space-y-1">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            {galleryModalTexts.dateLabel || 'Fecha del Evento:'}
+                          </label>
+                          <input
+                            id="input-gallery-date"
+                            type="date"
+                            required
+                            value={galleryDate}
+                            onChange={(e) => setGalleryDate(e.target.value)}
+                            className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                              isDark 
+                                ? 'bg-stone-950 border-stone-700 text-stone-100 focus:ring-amber-400' 
+                                : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
 
-                {/* PIN Code */}
-                <div className="space-y-1">
-                  <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                    {galleryModalTexts.pinLabel || 'PIN de Acceso Privado (4 dígitos):'}
-                  </label>
-                  <input
-                    id="input-gallery-pin"
-                    type="text"
-                    maxLength={8}
-                    required
-                    value={galleryPin}
-                    onChange={(e) => setGalleryPin(e.target.value)}
-                    placeholder={galleryModalTexts.pinPlaceholder || '2024'}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code font-bold focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-amber-300 focus:ring-amber-400' 
-                        : 'bg-white border-slate-300 text-blue-600 focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
+                      {/* Location & PIN Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            {galleryModalTexts.locationLabel || 'Ciudad / Región:'}
+                          </label>
+                          <input
+                            id="input-gallery-location"
+                            type="text"
+                            required
+                            value={galleryLocation}
+                            onChange={(e) => setGalleryLocation(e.target.value)}
+                            placeholder={galleryModalTexts.locationPlaceholder || 'Ej. Madrid / Palacio de Cristal'}
+                            className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                              isDark 
+                                ? 'bg-stone-950 border-stone-700 text-stone-100 placeholder:text-stone-500 focus:ring-amber-400' 
+                                : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500'
+                            }`}
+                          />
+                        </div>
 
-                {/* Cover Image with Device Upload & Presets */}
-                <div className="sm:col-span-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      Fotografía de Portada de la Sesión:
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <ImagePositionPicker
-                        value={galleryCoverPosition}
-                        onChange={setGalleryCoverPosition}
-                        previewImageUrl={galleryCover}
-                        label="Encuadre"
-                        theme={theme}
-                      />
-                      <span className="text-[11px] text-slate-400 hidden sm:inline">
-                        (Visible en cabecera y tarjetas)
-                      </span>
+                        <div className="space-y-1">
+                          <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
+                            {galleryModalTexts.pinLabel || 'PIN de Acceso Privado (4 dígitos):'}
+                          </label>
+                          <input
+                            id="input-gallery-pin"
+                            type="text"
+                            maxLength={8}
+                            required
+                            value={galleryPin}
+                            onChange={(e) => setGalleryPin(e.target.value)}
+                            placeholder={galleryModalTexts.pinPlaceholder || '2024'}
+                            className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code font-bold focus:outline-none focus:ring-2 ${
+                              isDark 
+                                ? 'bg-stone-950 border-stone-700 text-amber-300 focus:ring-amber-400' 
+                                : 'bg-white border-slate-300 text-blue-600 focus:ring-blue-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Permissions Card */}
+                    <div className={`p-5 rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs uppercase font-bold tracking-wider ${isDark ? 'text-amber-400' : colorTheme.twText}`}>
+                          Permisos para Clientes en esta Sesión
+                        </span>
+                        <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                          Habilitar funciones interactivas
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Favorites */}
+                        <label className={`flex items-center justify-between text-xs cursor-pointer p-2.5 rounded-xl border ${
+                          isDark ? 'bg-stone-900/50 border-stone-800 text-stone-200' : 'bg-white border-slate-200 text-slate-800'
+                        }`}>
+                          <div className="space-y-0.5 pr-2">
+                            <span className="font-semibold block">Selección y Envío de Fotos Favoritas</span>
+                            <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                              Permite al cliente marcar fotos con corazón y enviar su lista final.
+                            </span>
+                          </div>
+                          <input
+                            id="toggle-gallery-favorites"
+                            type="checkbox"
+                            checked={galleryAllowFavorites}
+                            onChange={(e) => setGalleryAllowFavorites(e.target.checked)}
+                            className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                          />
+                        </label>
+
+                        {/* Feedback */}
+                        <label className={`flex items-center justify-between text-xs cursor-pointer p-2.5 rounded-xl border ${
+                          isDark ? 'bg-stone-900/50 border-stone-800 text-stone-200' : 'bg-white border-slate-200 text-slate-800'
+                        }`}>
+                          <div className="space-y-0.5 pr-2">
+                            <span className="font-semibold block">Dejar Feedback & Solicitudes de Retoque</span>
+                            <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                              Permite calificar la sesión y redactar solicitudes de ajuste.
+                            </span>
+                          </div>
+                          <input
+                            id="toggle-gallery-feedback"
+                            type="checkbox"
+                            checked={galleryAllowFeedback}
+                            onChange={(e) => setGalleryAllowFeedback(e.target.checked)}
+                            className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
+                          />
+                        </label>
+
+                        {/* Direct Download */}
+                        <label className={`flex items-center justify-between text-xs p-2.5 rounded-xl border ${
+                          galleryWatermarkEnabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+                        } ${isDark ? 'bg-stone-900/50 border-stone-800 text-stone-200' : 'bg-white border-slate-200 text-slate-800'}`}>
+                          <div className="space-y-0.5 pr-2">
+                            <span className="font-semibold block">Descarga Directa de Alta Resolución (RAW/4K)</span>
+                            {galleryWatermarkEnabled ? (
+                              <span className="text-[10px] text-amber-400 font-semibold block">
+                                🔒 Bloqueado: restringido mientras la marca de agua esté activa.
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                                Permite la descarga directa de archivos originales en alta calidad.
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            id="toggle-gallery-download"
+                            type="checkbox"
+                            disabled={galleryWatermarkEnabled}
+                            checked={!galleryWatermarkEnabled && galleryAllowDownload}
+                            onChange={(e) => setGalleryAllowDownload(e.target.checked)}
+                            className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
                   </div>
 
-                  {/* Device Upload Zone */}
-                  <div className={`p-4 rounded-2xl border ${
-                    isDark ? 'bg-stone-950/80 border-stone-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                      {/* Thumbnail Preview */}
-                      <div className="relative group shrink-0 w-24 h-20 rounded-xl overflow-hidden border border-slate-700 shadow-md bg-black">
+                  {/* RIGHT COLUMN: Cover Photo, Clients & Watermark */}
+                  <div className="space-y-6">
+
+                    {/* Cover Image & Framing Card */}
+                    <div className={`p-5 rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs uppercase font-bold tracking-wider ${isDark ? 'text-amber-400' : colorTheme.twText}`}>
+                          Fotografía de Portada & Encuadre
+                        </span>
+                        <ImagePositionPicker
+                          value={galleryCoverPosition}
+                          onChange={setGalleryCoverPosition}
+                          previewImageUrl={galleryCover}
+                          label="Encuadre"
+                          theme={theme}
+                        />
+                      </div>
+
+                      {/* Live Cover Preview Container */}
+                      <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-slate-700 shadow-md bg-black">
                         {galleryCover ? (
                           <img 
                             src={galleryCover} 
                             alt="Portada Preview" 
-                            className="w-full h-full object-cover transition-all"
+                            className="w-full h-full object-cover transition-all duration-300"
                             style={{
                               objectPosition: getImagePositionStyle(galleryCoverPosition),
                             }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-500">
-                            <ImageIcon className="w-6 h-6" />
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                            <ImageIcon className="w-8 h-8 opacity-40" />
+                            <span className="text-xs">Sin fotografía de portada seleccionada</span>
                           </div>
                         )}
+                        <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-xs text-[10px] text-white/90 border border-white/20 font-mono-code">
+                          Encuadre: {getImagePositionLabel(galleryCoverPosition)}
+                        </div>
                       </div>
 
-                      {/* Device upload button and presets */}
-                      <div className="flex-1 space-y-2 text-center sm:text-left w-full">
+                      {/* Upload and URL controls */}
+                      <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <input
                             ref={galleryCoverInputRef}
@@ -2530,302 +2675,162 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span>Subir Portada desde tu Dispositivo</span>
                           </button>
                         </div>
-                        <p className={`text-[11px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                          Formatos recomendados: JPEG de alta resolución, PNG, WebP o RAW exportado.
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Direct URL input */}
-                    <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-1">
-                      <label className={`text-[11px] font-medium block ${isDark ? 'text-stone-400' : 'text-slate-600'}`}>
-                        O escribe la URL directa:
-                      </label>
-                      <input
-                        id="input-gallery-cover"
-                        type="url"
-                        value={galleryCover}
-                        onChange={(e) => setGalleryCover(e.target.value)}
-                        placeholder="https://images.unsplash.com/..."
-                        className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
-                          isDark 
-                            ? 'bg-stone-900 border-stone-700 text-stone-100 focus:ring-amber-400' 
-                            : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Global Photo Limits */}
-                <div className="sm:col-span-2 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      Límite General de Selección de Favoritas (fotos):
-                    </label>
-                    <span className="text-[11px] text-slate-400">
-                      Número base de fotos permitidas para selección
-                    </span>
-                  </div>
-                  <input
-                    id="input-gallery-max-favs"
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={galleryMaxFavs}
-                    onChange={(e) => {
-                      const val = Math.max(1, parseInt(e.target.value) || 1);
-                      setGalleryMaxFavs(val);
-                    }}
-                    className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono-code font-bold focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-stone-950 border-stone-700 text-rose-400 focus:ring-rose-500' 
-                        : 'bg-white border-slate-300 text-rose-600 focus:ring-rose-500'
-                    }`}
-                  />
-                </div>
-
-                {/* Assign to Client & Custom Limits */}
-                <div className="sm:col-span-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      Asignar a Cliente(s) y Límites Personalizados de Fotos:
-                    </label>
-                    <span className="text-[11px] text-slate-400">
-                      Establece cuántas fotos puede elegir cada cliente
-                    </span>
-                  </div>
-
-                  <div className={`space-y-2 p-3 rounded-2xl border max-h-56 overflow-y-auto ${
-                    isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    {clientUsers.length === 0 ? (
-                      <div className={`text-center py-4 text-xs ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
-                        No hay clientes registrados aún. Puedes agregar uno desde el botón "Nuevo Cliente".
-                      </div>
-                    ) : (
-                      clientUsers.map((client) => {
-                        const isChecked = gallerySelectedClients.includes(client.id);
-                        const customLimit = galleryClientLimits[client.id] ?? galleryMaxFavs;
-                        
-                        return (
-                          <div 
-                            key={client.id}
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border transition-all ${
-                              isChecked 
-                                ? isDark 
-                                  ? 'bg-stone-900 border-amber-500/40 shadow-xs' 
-                                  : 'bg-white border-blue-500/40 shadow-xs ring-1 ring-blue-500/10'
-                                : isDark 
-                                  ? 'bg-stone-900/40 border-stone-800/80 opacity-70' 
-                                  : 'bg-white/60 border-slate-200/80 opacity-70'
+                        <div className="space-y-1">
+                          <label className={`text-[11px] font-medium block ${isDark ? 'text-stone-400' : 'text-slate-600'}`}>
+                            O escribe la URL directa:
+                          </label>
+                          <input
+                            id="input-gallery-cover"
+                            type="url"
+                            value={galleryCover}
+                            onChange={(e) => setGalleryCover(e.target.value)}
+                            placeholder="https://images.unsplash.com/..."
+                            className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 ${
+                              isDark 
+                                ? 'bg-stone-900 border-stone-700 text-stone-100 focus:ring-amber-400' 
+                                : 'bg-white border-slate-300 text-slate-900 focus:ring-blue-500'
                             }`}
-                          >
-                            {/* Client Info & Checkbox */}
-                            <label className="flex items-center gap-3 text-xs cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setGallerySelectedClients([...gallerySelectedClients, client.id]);
-                                    if (!galleryClientLimits[client.id]) {
-                                      setGalleryClientLimits(prev => ({ ...prev, [client.id]: galleryMaxFavs }));
-                                    }
-                                  } else {
-                                    setGallerySelectedClients(gallerySelectedClients.filter(id => id !== client.id));
-                                  }
-                                }}
-                                className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
-                              />
-                              <div className="flex items-center gap-2">
-                                <img 
-                                  src={client.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                                  alt={client.name}
-                                  className="w-6 h-6 rounded-full object-cover border border-slate-700" 
-                                />
-                                <div>
-                                  <span className={`font-semibold ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
-                                    {client.name}
-                                  </span>
-                                  <span className={`block text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                                    {client.email}
-                                  </span>
-                                </div>
-                              </div>
-                            </label>
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                            {/* Custom Limit per Client (Visible when assigned) */}
-                            {isChecked && (
-                              <div className="flex items-center gap-2 pl-7 sm:pl-0">
-                                <span className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-slate-600'}`}>
-                                  Límite personalizado:
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max="1000"
-                                    value={customLimit}
-                                    onChange={(e) => {
-                                      const val = Math.max(1, parseInt(e.target.value) || 1);
-                                      setGalleryClientLimits(prev => ({
-                                        ...prev,
-                                        [client.id]: val
-                                      }));
-                                    }}
-                                    className={`w-16 border rounded-lg px-2 py-1 text-xs font-mono-code font-bold text-center focus:outline-none focus:ring-2 ${
-                                      isDark 
-                                        ? 'bg-stone-950 border-stone-700 text-amber-400 focus:ring-amber-400' 
-                                        : 'bg-slate-50 border-slate-300 text-blue-700 focus:ring-blue-500'
-                                    }`}
-                                  />
-                                  <span className={`text-[10px] ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>fotos</span>
-                                </div>
-                              </div>
-                            )}
+                    {/* Client Assignment & Limits Card */}
+                    <div className={`p-5 rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs uppercase font-bold tracking-wider ${isDark ? 'text-amber-400' : colorTheme.twText}`}>
+                          Clientes Asignados & Límite de Fotos
+                        </span>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className={`text-[11px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>Límite base:</span>
+                          <input
+                            id="input-gallery-max-favs"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            value={galleryMaxFavs}
+                            onChange={(e) => {
+                              const val = Math.max(1, parseInt(e.target.value) || 1);
+                              setGalleryMaxFavs(val);
+                            }}
+                            className={`w-14 border rounded-lg px-2 py-0.5 text-xs font-mono-code font-bold text-center ${
+                              isDark ? 'bg-stone-900 border-stone-700 text-rose-400' : 'bg-white border-slate-300 text-rose-600'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={`space-y-2 p-3 rounded-xl border max-h-44 overflow-y-auto ${
+                        isDark ? 'bg-stone-900/60 border-stone-800' : 'bg-white border-slate-200'
+                      }`}>
+                        {clientUsers.length === 0 ? (
+                          <div className={`text-center py-4 text-xs ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
+                            No hay clientes registrados aún. Puedes agregar uno desde el botón "Nuevo Cliente".
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Section 1: Gallery Specific Permissions */}
-                <div className="sm:col-span-2 space-y-3 pt-2 border-t border-stone-800/60">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[11px] uppercase font-bold tracking-wider block ${
-                      isDark ? 'text-amber-400' : colorTheme.twText
-                    }`}>
-                      Permisos Específicos para esta Galería:
-                    </span>
-                    <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      Controlan las funciones disponibles para los clientes en esta sesión
-                    </span>
-                  </div>
-
-                  <div className={`space-y-2.5 p-3.5 rounded-2xl border ${
-                    isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    {/* Favorites permission */}
-                    <label className={`flex items-center justify-between text-xs cursor-pointer ${
-                      isDark ? 'text-stone-300' : 'text-slate-700'
-                    }`}>
-                      <div className="space-y-0.5">
-                        <span className="font-medium block">Permitir Selección y Envío de Fotos Favoritas</span>
-                        <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
-                          Habilita el marcado de fotos con corazón y el envío de la selección final.
-                        </span>
-                      </div>
-                      <input
-                        id="toggle-gallery-favorites"
-                        type="checkbox"
-                        checked={galleryAllowFavorites}
-                        onChange={(e) => setGalleryAllowFavorites(e.target.checked)}
-                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
-                      />
-                    </label>
-
-                    {/* Feedback permission */}
-                    <label className={`flex items-center justify-between text-xs cursor-pointer ${
-                      isDark ? 'text-stone-300' : 'text-slate-700'
-                    }`}>
-                      <div className="space-y-0.5">
-                        <span className="font-medium block">Permitir Dejar Feedback y Solicitudes de Retoque</span>
-                        <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
-                          Permite al cliente valorar la sesión y redactar solicitudes de ajuste.
-                        </span>
-                      </div>
-                      <input
-                        id="toggle-gallery-feedback"
-                        type="checkbox"
-                        checked={galleryAllowFeedback}
-                        onChange={(e) => setGalleryAllowFeedback(e.target.checked)}
-                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
-                      />
-                    </label>
-
-                    {/* High-res download permission (BLOCKED if watermark is active) */}
-                    <label className={`flex items-center justify-between text-xs ${
-                      galleryWatermarkEnabled ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'
-                    } ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      <div className="space-y-0.5 pr-2">
-                        <span className="font-medium block">Permitir Descarga Directa de Alta Resolución (RAW/4K)</span>
-                        {galleryWatermarkEnabled ? (
-                          <span className="text-[10px] text-amber-400 font-semibold block">
-                            🔒 Bloqueado: La descarga general de la galería está restringida mientras la marca de agua esté activa. (Las fotos individuales exentas sí permitirán descarga directa).
-                          </span>
                         ) : (
-                          <span className={`text-[10px] block ${isDark ? 'text-stone-500' : 'text-slate-400'}`}>
-                            Permite la descarga directa de archivos originales en alta calidad.
-                          </span>
+                          clientUsers.map((client) => {
+                            const isChecked = gallerySelectedClients.includes(client.id);
+                            const customLimit = galleryClientLimits[client.id] ?? galleryMaxFavs;
+                            
+                            return (
+                              <div 
+                                key={client.id}
+                                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border transition-all ${
+                                  isChecked 
+                                    ? isDark 
+                                      ? 'bg-stone-900 border-amber-500/40 shadow-xs' 
+                                      : 'bg-white border-blue-500/40 shadow-xs ring-1 ring-blue-500/10'
+                                    : isDark 
+                                      ? 'bg-stone-900/40 border-stone-800/80 opacity-70' 
+                                      : 'bg-white/60 border-slate-200/80 opacity-70'
+                                }`}
+                              >
+                                <label className="flex items-center gap-3 text-xs cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setGallerySelectedClients([...gallerySelectedClients, client.id]);
+                                        if (!galleryClientLimits[client.id]) {
+                                          setGalleryClientLimits(prev => ({ ...prev, [client.id]: galleryMaxFavs }));
+                                        }
+                                      } else {
+                                        setGallerySelectedClients(gallerySelectedClients.filter(id => id !== client.id));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <img 
+                                      src={client.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
+                                      alt={client.name}
+                                      className="w-6 h-6 rounded-full object-cover border border-slate-700" 
+                                    />
+                                    <div>
+                                      <span className={`font-semibold ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
+                                        {client.name}
+                                      </span>
+                                      <span className={`block text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                                        {client.email}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </label>
+
+                                {isChecked && (
+                                  <div className="flex items-center gap-1.5 pl-7 sm:pl-0 text-xs">
+                                    <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>Límite:</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="1000"
+                                      value={customLimit}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setGalleryClientLimits(prev => ({ ...prev, [client.id]: val }));
+                                      }}
+                                      className={`w-14 border rounded-lg px-2 py-0.5 text-xs font-mono-code font-bold text-center ${
+                                        isDark ? 'bg-stone-950 border-stone-700 text-amber-400' : 'bg-slate-50 border-slate-300 text-blue-700'
+                                      }`}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
                         )}
                       </div>
-                      <input
-                        id="toggle-gallery-download"
-                        type="checkbox"
-                        disabled={galleryWatermarkEnabled}
-                        checked={!galleryWatermarkEnabled && galleryAllowDownload}
-                        onChange={(e) => setGalleryAllowDownload(e.target.checked)}
-                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-                      />
-                    </label>
-                  </div>
-                </div>
+                    </div>
 
-                {/* Section 2: Watermark Protection Settings */}
-                <div className="sm:col-span-2 space-y-3 pt-2 border-t border-stone-800/60">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[11px] uppercase font-bold tracking-wider block ${
-                      isDark ? 'text-violet-400' : 'text-violet-600'
+                    {/* Watermark Protection Card */}
+                    <div className={`p-5 rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-stone-950/60 border-stone-800' : 'bg-slate-50 border-slate-200'
                     }`}>
-                      Protección y Marca de Agua de la Galería:
-                    </span>
-                    <span className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      Aplica protección visual sobre las fotos de esta sesión
-                    </span>
-                  </div>
-
-                  <div className={`p-4 rounded-2xl border space-y-4 ${
-                    isDark ? 'bg-stone-950 border-stone-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    {/* Main Watermark Checkbox */}
-                    <label className="flex items-center justify-between text-xs cursor-pointer select-none">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-violet-400" />
-                          <span className={`font-bold ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                            Activar Marca de Agua en esta Galería
-                          </span>
-                        </div>
-                        <p className={`text-[10px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                          Protege las fotografías contra uso no autorizado. Al activarse, la descarga general de la galería se deshabilita automáticamente.
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs uppercase font-bold tracking-wider ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
+                          Protección y Marca de Agua
+                        </span>
+                        <input
+                          id="toggle-gallery-watermark-enabled"
+                          type="checkbox"
+                          checked={galleryWatermarkEnabled}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setGalleryWatermarkEnabled(checked);
+                            if (checked) {
+                              setGalleryAllowDownload(false);
+                            }
+                          }}
+                          className="w-5 h-5 rounded text-violet-500 focus:ring-violet-400 cursor-pointer"
+                        />
                       </div>
-                      <input
-                        id="toggle-gallery-watermark-enabled"
-                        type="checkbox"
-                        checked={galleryWatermarkEnabled}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setGalleryWatermarkEnabled(checked);
-                          if (checked) {
-                            setGalleryAllowDownload(false);
-                          }
-                        }}
-                        className="w-5 h-5 rounded text-violet-500 focus:ring-violet-400 cursor-pointer"
-                      />
-                    </label>
 
-                    {/* Watermark Configuration Options (Visible only when watermark is enabled) */}
-                    {galleryWatermarkEnabled && (
-                      <div className={`space-y-4 pt-4 border-t ${isDark ? 'border-stone-800' : 'border-slate-200'} animate-in fade-in duration-200`}>
-                        
-                        {/* Type Selector: Text vs Image */}
-                        <div className="space-y-1.5">
-                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                            Tipo de Marca de Agua:
-                          </label>
+                      {galleryWatermarkEnabled && (
+                        <div className="space-y-4 pt-2">
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
@@ -2833,11 +2838,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               onClick={() => setGalleryWatermarkType('text')}
                               className={`py-2 px-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
                                 galleryWatermarkType === 'text'
-                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
+                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md'
                                   : isDark ? 'bg-stone-900 text-stone-300 border-stone-800 hover:bg-stone-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                             >
-                              ✍️ Frase o Texto Personalizado
+                              ✍️ Texto Personalizado
                             </button>
                             <button
                               type="button"
@@ -2845,21 +2850,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               onClick={() => setGalleryWatermarkType('image')}
                               className={`py-2 px-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
                                 galleryWatermarkType === 'image'
-                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
+                                  ? 'bg-violet-600 text-white border-violet-500 shadow-md'
                                   : isDark ? 'bg-stone-900 text-stone-300 border-stone-800 hover:bg-stone-800' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                             >
-                              🖼️ Imagen o Logotipo
+                              🖼️ Imagen / Logo
                             </button>
                           </div>
-                        </div>
 
-                        {/* Content Input depending on type */}
-                        {galleryWatermarkType === 'text' ? (
-                          <div className="space-y-1">
-                            <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                              Frase o Texto de la Marca de Agua:
-                            </label>
+                          {galleryWatermarkType === 'text' ? (
                             <input
                               id="input-watermark-text"
                               type="text"
@@ -2872,15 +2871,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   : 'bg-white border-slate-300 text-slate-900 focus:ring-violet-500'
                               }`}
                             />
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                              Imagen o Logotipo de la Marca de Agua:
-                            </label>
-                            
-                            <div className="flex flex-col sm:flex-row items-center gap-3">
-                              {/* Hidden file input */}
+                          ) : (
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
                               <input
                                 ref={watermarkImageInputRef}
                                 type="file"
@@ -2892,119 +2884,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 type="button"
                                 id="upload-watermark-logo-btn"
                                 onClick={() => watermarkImageInputRef.current?.click()}
-                                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                className="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                               >
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>Subir Logo desde tu Dispositivo</span>
+                                <span>Subir Logo</span>
                               </button>
-                              
                               <input
                                 id="input-watermark-image-url"
                                 type="url"
                                 value={galleryWatermarkImageUrl}
                                 onChange={(e) => setGalleryWatermarkImageUrl(e.target.value)}
-                                placeholder="O pega la URL del logo (PNG transparente recomendado)..."
-                                className={`flex-1 w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 ${
-                                  isDark 
-                                    ? 'bg-stone-900 border-stone-700 text-stone-100 focus:ring-violet-400' 
-                                    : 'bg-white border-slate-300 text-slate-900 focus:ring-violet-500'
+                                placeholder="URL del logo PNG..."
+                                className={`flex-1 w-full border rounded-xl px-3 py-1.5 text-xs ${
+                                  isDark ? 'bg-stone-900 border-stone-700 text-stone-100' : 'bg-white border-slate-300 text-slate-900'
                                 }`}
                               />
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Layout / Position: Center vs Repeated */}
-                        <div className="space-y-1.5">
-                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                            Disposición de la Marca de Agua:
-                          </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                          {/* Position radios */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <label className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer ${
                               galleryWatermarkPosition === 'center'
-                                ? 'bg-violet-500/10 border-violet-500 text-violet-300 shadow-xs'
-                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-white border-slate-200 text-slate-700'
+                                ? 'bg-violet-500/10 border-violet-500 text-violet-300'
+                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-400' : 'bg-white border-slate-200 text-slate-600'
                             }`}>
                               <input
                                 type="radio"
                                 name="watermarkPosition"
                                 checked={galleryWatermarkPosition === 'center'}
                                 onChange={() => setGalleryWatermarkPosition('center')}
-                                className="text-violet-500 focus:ring-violet-400"
+                                className="text-violet-500"
                               />
-                              <div>
-                                <span className="font-semibold text-xs block">Una sola vez en el centro</span>
-                                <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                                  Sello central destacado con alta visibilidad
-                                </span>
-                              </div>
+                              <span>Centro Único</span>
                             </label>
 
-                            <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                            <label className={`flex items-center gap-2 p-2 rounded-xl border cursor-pointer ${
                               galleryWatermarkPosition === 'repeated'
-                                ? 'bg-violet-500/10 border-violet-500 text-violet-300 shadow-xs'
-                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-300' : 'bg-white border-slate-200 text-slate-700'
+                                ? 'bg-violet-500/10 border-violet-500 text-violet-300'
+                                : isDark ? 'bg-stone-900 border-stone-800 text-stone-400' : 'bg-white border-slate-200 text-slate-600'
                             }`}>
                               <input
                                 type="radio"
                                 name="watermarkPosition"
                                 checked={galleryWatermarkPosition === 'repeated'}
                                 onChange={() => setGalleryWatermarkPosition('repeated')}
-                                className="text-violet-500 focus:ring-violet-400"
+                                className="text-violet-500"
                               />
-                              <div>
-                                <span className="font-semibold text-xs block">Repetida por toda la imagen</span>
-                                <span className={`text-[10px] block ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                                  Patrón diagonal en mosaico que cubre toda la toma
-                                </span>
-                              </div>
+                              <span>Mosaico Repetido</span>
                             </label>
                           </div>
                         </div>
+                      )}
+                    </div>
 
-                        {/* Live Watermark Preview Card */}
-                        <div className="space-y-1.5 pt-1">
-                          <label className={`text-xs font-semibold block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                            Vista Previa de la Protección en Directo:
-                          </label>
-                          <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-700 shadow-inner bg-slate-950 flex items-center justify-center">
-                            <img
-                              src={galleryCover || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80'}
-                              alt="Watermark preview"
-                              className="w-full h-full object-cover filter brightness-90"
-                            />
-                            {/* Watermark overlay component in real-time */}
-                            <WatermarkOverlay
-                              watermarkEnabled={true}
-                              excludeWatermark={false}
-                              watermarkType={galleryWatermarkType}
-                              watermarkText={galleryWatermarkText}
-                              watermarkImageUrl={galleryWatermarkImageUrl}
-                              watermarkPosition={galleryWatermarkPosition}
-                              watermarkOpacity={galleryWatermarkOpacity}
-                            />
-                            <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-sm text-[10px] text-white/90 border border-white/20 font-mono-code z-20">
-                              Muestra en vivo ({galleryWatermarkPosition === 'center' ? 'Centro' : 'Mosaico repetido'})
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-                    )}
                   </div>
+
                 </div>
 
               </div>
 
-              <div className={`flex items-center justify-end gap-3 pt-4 border-t ${
-                isDark ? 'border-stone-800' : 'border-slate-100'
+              {/* Fixed Footer */}
+              <div className={`px-6 sm:px-8 py-4 border-t shrink-0 flex items-center justify-between sm:justify-end gap-3 ${
+                isDark ? 'border-stone-800 bg-stone-950/90' : 'border-slate-100 bg-slate-50'
               }`}>
+                <span className={`text-xs ${isDark ? 'text-stone-400' : 'text-slate-500'} hidden sm:inline mr-auto`}>
+                  {editingGallery ? `Editando sesión "${galleryTitle || 'Sin título'}"` : 'Crea la sesión para comenzar a subir fotografías'}
+                </span>
                 <button
                   type="button"
                   id="cancel-gallery-btn"
                   onClick={() => setShowNewGalleryModal(false)}
-                  className={`px-4 py-2 rounded-xl text-xs cursor-pointer ${
-                    isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-700'
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer border ${
+                    isDark ? 'border-stone-700 text-stone-300 hover:bg-stone-800' : 'border-slate-300 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   Cancelar
@@ -3012,9 +2964,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="submit"
                   id="save-gallery-submit-btn"
-                  className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer text-white flex items-center gap-2 ${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`}
                 >
-                  {editingGallery ? 'Guardar Cambios' : 'Crear Galería'}
+                  <Save className="w-4 h-4" />
+                  <span>{editingGallery ? 'Guardar Cambios' : 'Crear Galería'}</span>
                 </button>
               </div>
             </form>
