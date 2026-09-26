@@ -14,6 +14,7 @@ import { BatchDownloadModal } from './BatchDownloadModal';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
 import { typographyToStyle } from '../services/googleFontsService';
+import { ImagePositionPicker, getImagePositionStyle } from './ImagePositionPicker';
 
 interface GalleryViewProps {
   gallery: GallerySession;
@@ -362,7 +363,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               src={gallery.coverImage} 
               alt={gallery.title} 
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover opacity-35 filter blur-sm scale-105"
+              className="w-full h-full object-cover opacity-35 filter blur-sm scale-105 transition-all duration-300"
+              style={{
+                objectPosition: getImagePositionStyle(gallery.coverImagePosition),
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
           </div>
@@ -389,6 +393,23 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 <HardDrive className={`w-3.5 h-3.5 ${colorTheme.twText}`} />
                 <span className="font-mono-code">{formatBytes(totalGalleryBytes)} en Servidor</span>
               </div>
+
+              {currentUser?.role === 'admin' && onUpdateGallery && (
+                <div className="ml-auto">
+                  <ImagePositionPicker
+                    value={gallery.coverImagePosition || 'center'}
+                    onChange={(newPos) => {
+                      onUpdateGallery({
+                        ...gallery,
+                        coverImagePosition: newPos,
+                      });
+                    }}
+                    previewImageUrl={gallery.coverImage}
+                    label="Encuadre Portada"
+                    theme={theme}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Main Title & Subtitle */}
@@ -644,6 +665,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     loading="lazy"
+                    style={{
+                      objectPosition: getImagePositionStyle(image.imagePosition),
+                    }}
                   />
 
                   {/* Watermark Protection Overlay */}
@@ -713,6 +737,22 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
                   {/* Action buttons: Admin Watermark Toggle & Download Button */}
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Admin Image Position Picker */}
+                    {currentUser?.role === 'admin' && onUpdateImage && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <ImagePositionPicker
+                          value={image.imagePosition || 'center'}
+                          onChange={(newPos) => {
+                            onUpdateImage({ ...image, imagePosition: newPos });
+                          }}
+                          previewImageUrl={image.url}
+                          label="Encuadre"
+                          theme={theme}
+                          compact
+                        />
+                      </div>
+                    )}
+
                     {/* Admin Watermark Exemption Button */}
                     {currentUser?.role === 'admin' && gallery.watermarkEnabled && onUpdateImage && (
                       <button

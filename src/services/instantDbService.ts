@@ -235,6 +235,7 @@ export async function createGalleryInDb(gallery: GallerySession) {
       location: gallery.location,
       venueName: gallery.venueName || '',
       coverImage: gallery.coverImage,
+      coverImagePosition: gallery.coverImagePosition || 'center',
       description: gallery.description,
       accessPin: gallery.accessPin,
       isPasswordProtected: gallery.isPasswordProtected ?? true,
@@ -275,6 +276,7 @@ export async function updateGalleryInDb(gallery: GallerySession) {
       location: gallery.location,
       venueName: gallery.venueName || '',
       coverImage: gallery.coverImage,
+      coverImagePosition: gallery.coverImagePosition || 'center',
       description: gallery.description,
       accessPin: gallery.accessPin,
       isPasswordProtected: gallery.isPasswordProtected,
@@ -391,6 +393,7 @@ export async function uploadImageToDb(image: GalleryImage) {
       optimized: image.optimized,
       clientNote: image.clientNote || '',
       excludeWatermark: !!image.excludeWatermark,
+      imagePosition: image.imagePosition || 'center',
     })
   ]);
 }
@@ -424,6 +427,7 @@ export async function updateImageInDb(image: GalleryImage) {
       optimized: image.optimized,
       clientNote: image.clientNote || '',
       excludeWatermark: !!image.excludeWatermark,
+      imagePosition: image.imagePosition || 'center',
     })
   ]);
 }

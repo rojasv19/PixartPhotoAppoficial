@@ -519,7 +519,13 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                 >
                   {formData.portalHeroTitle && <span>{formData.portalHeroTitle} </span>}
                   {formData.portalHeroHighlight && formData.portalHeroHighlight.trim().length > 0 && (
-                    <span className={`${activeColorTheme.twText} italic drop-shadow-sm`}>
+                    <span 
+                      className={`${formData.portalHeroHighlightColor ? '' : activeColorTheme.twText} italic drop-shadow-sm`}
+                      style={{
+                        ...typographyToStyle(formData.portalHeroHighlightTypography || formData.customTypographyMap?.portalHeroHighlight),
+                        color: formData.portalHeroHighlightColor || formData.portalHeroHighlightTypography?.color || undefined,
+                      }}
+                    >
                       {formData.portalHeroHighlight}
                     </span>
                   )}
@@ -1753,9 +1759,24 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Palabra / Frase Resaltada (Color de Marca):
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className={`text-xs font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Palabra / Frase Resaltada:
+                  </label>
+                  <TypographyControl
+                    label="Tipografía Frase Resaltada"
+                    value={formData.portalHeroHighlightTypography || formData.customTypographyMap?.portalHeroHighlight}
+                    onChange={(style) => {
+                      handleCustomTypographyChange('portalHeroHighlight', style);
+                      handleFieldChange('portalHeroHighlightTypography', style);
+                      if (style.color) {
+                        handleFieldChange('portalHeroHighlightColor', style.color);
+                      }
+                    }}
+                    sampleText={formData.portalHeroHighlight || 'máxima resolución.'}
+                    theme={theme}
+                  />
+                </div>
                 <input
                   type="text"
                   id="branding-hero-highlight-input"
@@ -1766,6 +1787,60 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                     isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
                   }`}
                 />
+
+                {/* Specific Highlight Color selector (independent from Brand Color) */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                    Color exclusivo:
+                  </span>
+                  {[
+                    { label: 'Color Marca', color: '' },
+                    { label: 'Dorado', color: '#F59E0B' },
+                    { label: 'Ámbar Cálido', color: '#D97706' },
+                    { label: 'Esmeralda', color: '#10B981' },
+                    { label: 'Rosa / Rose', color: '#F43F5E' },
+                    { label: 'Cian', color: '#06B6D4' },
+                    { label: 'Blanco', color: '#FFFFFF' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => handleFieldChange('portalHeroHighlightColor', preset.color)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 cursor-pointer transition-all ${
+                        (formData.portalHeroHighlightColor || '') === preset.color
+                          ? 'border-blue-500 bg-blue-500/20 text-blue-400 font-bold'
+                          : isDark
+                          ? 'border-stone-800 bg-stone-900/60 text-stone-300 hover:border-stone-700'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      {preset.color ? (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: preset.color }} />
+                      ) : (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-dashed border-current" />
+                      )}
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <input
+                      type="color"
+                      value={formData.portalHeroHighlightColor || '#3B82F6'}
+                      onChange={(e) => handleFieldChange('portalHeroHighlightColor', e.target.value)}
+                      className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent"
+                      title="Seleccionar color HEX personalizado"
+                    />
+                    <input
+                      type="text"
+                      value={formData.portalHeroHighlightColor || ''}
+                      onChange={(e) => handleFieldChange('portalHeroHighlightColor', e.target.value)}
+                      placeholder="HEX ej. #F59E0B"
+                      className={`w-24 text-[10px] rounded-lg px-2 py-1 border font-mono-code ${
+                        isDark ? 'bg-slate-950 border-slate-700 text-stone-200' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

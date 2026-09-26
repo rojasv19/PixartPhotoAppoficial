@@ -10,6 +10,7 @@ import { COLOR_PRESET_MAP, DEFAULT_BRANDING } from '../services/brandingService'
 import { BrandIcon } from './BrandIcon';
 import { LockedGalleryModal } from './LockedGalleryModal';
 import { typographyToStyle } from '../services/googleFontsService';
+import { getImagePositionStyle } from './ImagePositionPicker';
 
 interface PublicClientPortalProps {
   currentUser: User | null;
@@ -172,7 +173,13 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
             >
               {branding?.portalHeroTitle && <span>{branding.portalHeroTitle} </span>}
               {branding?.portalHeroHighlight && branding.portalHeroHighlight.trim().length > 0 && (
-                <span className={`${colorTheme.twText} italic drop-shadow-md`}>
+                <span 
+                  className={`${branding.portalHeroHighlightColor ? '' : colorTheme.twText} italic drop-shadow-md`}
+                  style={{
+                    ...typographyToStyle(branding.portalHeroHighlightTypography || branding.customTypographyMap?.portalHeroHighlight),
+                    color: branding.portalHeroHighlightColor || branding.portalHeroHighlightTypography?.color || undefined,
+                  }}
+                >
                   {branding.portalHeroHighlight}
                 </span>
               )}
@@ -267,6 +274,9 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
                     src={gallery.coverImage}
                     alt={gallery.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    style={{
+                      objectPosition: getImagePositionStyle(gallery.coverImagePosition),
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   

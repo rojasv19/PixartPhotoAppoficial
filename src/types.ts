@@ -62,6 +62,7 @@ export interface GalleryImage {
   optimized: boolean;
   clientNote?: string;
   excludeWatermark?: boolean; // If true, watermark is removed from this photo and direct download is enabled
+  imagePosition?: string; // 9-point framing e.g. 'center', 'center-top', 'center-bottom', 'left-top', etc.
 }
 
 export interface TypographyStyle {
@@ -89,6 +90,7 @@ export interface GallerySession {
   location: string;
   venueName?: string;
   coverImage: string;
+  coverImagePosition?: string; // 9-point framing e.g. 'center', 'center-top', 'center-bottom', etc.
   description: string;
   accessPin: string;
   isPasswordProtected: boolean;
@@ -285,6 +287,8 @@ export interface StudioBrandingConfig {
   portalHeroBadge: string;
   portalHeroTitle: string;
   portalHeroHighlight: string;
+  portalHeroHighlightColor?: string;
+  portalHeroHighlightTypography?: TypographyStyle;
   portalHeroSubtitle: string;
   portalHeroMediaType: 'image' | 'video' | 'none';
   portalHeroBgImage: string;

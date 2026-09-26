@@ -14,6 +14,7 @@ import { AdminFavoritesView } from './AdminFavoritesView';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
 import { extractExifFromFile } from '../services/exifService';
+import { ImagePositionPicker, getImagePositionStyle } from './ImagePositionPicker';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -151,6 +152,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [galleryLocation, setGalleryLocation] = useState('');
   const [galleryVenue, setGalleryVenue] = useState('');
   const [galleryCover, setGalleryCover] = useState('https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80');
+  const [galleryCoverPosition, setGalleryCoverPosition] = useState('center');
   const [galleryPin, setGalleryPin] = useState(String(Math.floor(1000 + Math.random() * 9000)));
   const [gallerySelectedClients, setGallerySelectedClients] = useState<string[]>([]);
   const [galleryClientLimits, setGalleryClientLimits] = useState<Record<string, number>>({});
@@ -302,6 +304,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         location: galleryLocation,
         venueName: galleryVenue,
         coverImage: galleryCover,
+        coverImagePosition: galleryCoverPosition,
         accessPin: galleryPin,
         clientIds: gallerySelectedClients,
         clientNames: assignedNames,
@@ -332,6 +335,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         location: galleryLocation,
         venueName: galleryVenue,
         coverImage: galleryCover,
+        coverImagePosition: galleryCoverPosition,
         description: `Sesión profesional realizada en ${galleryLocation} el ${galleryDate}.`,
         accessPin: galleryPin,
         isPasswordProtected: true,
@@ -364,6 +368,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setGalleryLocation('');
     setGalleryVenue('');
     setGalleryCover('https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80');
+    setGalleryCoverPosition('center');
     setGalleryPin(String(Math.floor(1000 + Math.random() * 9000)));
     setGallerySelectedClients([]);
     setGalleryClientLimits({});
@@ -390,6 +395,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setGalleryLocation(gal.location);
     setGalleryVenue(gal.venueName || '');
     setGalleryCover(gal.coverImage);
+    setGalleryCoverPosition(gal.coverImagePosition || 'center');
     setGalleryPin(gal.accessPin);
     setGallerySelectedClients(gal.clientIds || []);
     setGalleryClientLimits(gal.clientPhotoLimits || {});
@@ -1928,6 +1934,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 className={`w-10 h-10 rounded-lg object-cover border ${
                                   isDark ? 'border-stone-700/60' : 'border-slate-200'
                                 }`}
+                                style={{
+                                  objectPosition: getImagePositionStyle(img.imagePosition),
+                                }}
                               />
                               <div className="font-sans">
                                 <p className={`font-semibold truncate max-w-[180px] ${
@@ -1955,7 +1964,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </td>
 
                           <td className={`px-4 py-3 font-sans ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                            {img.cameraModel || 'Canon EOS R5'}
+                            {img.cameraModel || 'No disponible / Web'}
                           </td>
 
                           <td className="px-4 py-3 font-sans">
@@ -2003,7 +2012,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </td>
 
                           <td className="px-4 py-3 text-right font-sans">
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {onUpdateImage && (
+                                <ImagePositionPicker
+                                  value={img.imagePosition || 'center'}
+                                  onChange={(newPos) => {
+                                    onUpdateImage({
+                                      ...img,
+                                      imagePosition: newPos,
+                                    });
+                                  }}
+                                  previewImageUrl={img.url}
+                                  label="Alinear"
+                                  theme={theme}
+                                  compact
+                                />
+                              )}
+
                               {/* Direct download if photo is exempt or gallery allows download */}
                               {(img.excludeWatermark || (!parentGal?.watermarkEnabled && parentGal?.allowDownloadHighRes)) && (
                                 <button
@@ -2448,9 +2473,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <label className={`text-xs font-medium block ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
                       Fotografía de Portada de la Sesión:
                     </label>
-                    <span className="text-[11px] text-slate-400">
-                      Visible en la tarjeta del portal y cabecera
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <ImagePositionPicker
+                        value={galleryCoverPosition}
+                        onChange={setGalleryCoverPosition}
+                        previewImageUrl={galleryCover}
+                        label="Encuadre"
+                        theme={theme}
+                      />
+                      <span className="text-[11px] text-slate-400 hidden sm:inline">
+                        (Visible en cabecera y tarjetas)
+                      </span>
+                    </div>
                   </div>
 
                   {/* Device Upload Zone */}
@@ -2464,7 +2498,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <img 
                             src={galleryCover} 
                             alt="Portada Preview" 
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-all"
+                            style={{
+                              objectPosition: getImagePositionStyle(galleryCoverPosition),
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-500">

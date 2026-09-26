@@ -7,6 +7,7 @@ import { GalleryImage, GallerySession, User, StudioBrandingConfig } from '../typ
 import { formatBytes, downloadSingleImage } from '../services/storageService';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { WatermarkOverlay } from './WatermarkOverlay';
+import { ImagePositionPicker } from './ImagePositionPicker';
 
 interface PhotoLightboxProps {
   image: GalleryImage | null;
@@ -451,6 +452,24 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                     <span className="text-slate-200 font-mono-code">{image.iso ? `ISO ${image.iso}` : '—'}</span>
                   </div>
                 </div>
+
+                {currentUser?.role === 'admin' && onUpdateImage && (
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">Encuadre / Punto Focal</span>
+                    <ImagePositionPicker
+                      value={image.imagePosition || 'center'}
+                      onChange={(newPos) => {
+                        const updated = { ...image, imagePosition: newPos };
+                        onUpdateImage(updated);
+                        onSelectImage(updated);
+                      }}
+                      previewImageUrl={image.url}
+                      label="Alinear"
+                      theme="dark"
+                      compact
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Storage & Resolution Metrics */}

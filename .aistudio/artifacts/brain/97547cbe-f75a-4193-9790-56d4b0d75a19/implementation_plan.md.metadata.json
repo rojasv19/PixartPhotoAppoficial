@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan detallado para corregir la eliminación de clientes con modal de confirmación, lectura verídica de metadatos EXIF de cámaras en la subida de fotografías, actualización fiel de la previsualización del Hero 1:1 en Personalización y Marca, y soporte para campos de texto vacíos con auto-centrado dinámico en el Hero.",
-  "updatedAt":  "2026-09-26T18:21:00.325873674Z",
+  "summary":  "Plan de implementación para permitir tipografía y color independiente en la frase resaltada del Hero, y una herramienta con cuadrícula de 9 puntos cardinales para configurar el encuadre/posición de portadas y fotos individuales.",
+  "updatedAt":  "2026-09-26T18:44:13.952965664Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
