@@ -1,4 +1,5 @@
 import { StudioBrandingConfig, BrandIconName, ColorPreset, ModalTextsConfig } from '../types';
+import { safeSetItem } from './storageService';
 
 export const DEFAULT_MODAL_TEXTS: ModalTextsConfig = {
   authModal: {
@@ -193,9 +194,12 @@ export function loadBrandingFromStorage(): StudioBrandingConfig {
 
 export function saveBrandingToStorage(config: StudioBrandingConfig): void {
   try {
-    localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(config));
+    const success = safeSetItem(BRANDING_STORAGE_KEY, JSON.stringify(config));
+    if (!success) {
+      console.warn('Notice: Branding configuration preserved in memory and cloud sync.');
+    }
   } catch (error) {
-    console.error('Failed to save branding to storage:', error);
+    console.warn('Failed to save branding to storage:', error);
   }
 }
 

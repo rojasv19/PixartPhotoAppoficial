@@ -28,8 +28,52 @@ export function loadServerQuotaFromStorage(): number {
   return DEFAULT_SERVER_QUOTA_BYTES;
 }
 
+export function safeSetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err: any) {
+    const isQuotaError = 
+      err?.name === 'QuotaExceededError' || 
+      err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' || 
+      err?.code === 22 || 
+      err?.code === 1014 ||
+      (typeof err?.message === 'string' && err.message.toLowerCase().includes('quota'));
+
+    if (isQuotaError) {
+      console.warn(`[SafeStorage] LocalStorage quota exceeded while writing "${key}". Purgando caché no crítica para liberar memoria...`);
+      // Evict non-critical heavy caches (images cache, old logs, branding cache)
+      try {
+        localStorage.removeItem(STORAGE_KEYS.IMAGES);
+      } catch {}
+
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch {
+        // If still full, purge logs and notifications
+        try {
+          localStorage.removeItem(STORAGE_KEYS.LOGS);
+          localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+        } catch {}
+
+        try {
+          localStorage.setItem(key, value);
+          return true;
+        } catch (finalErr) {
+          console.warn(`[SafeStorage] Could not write "${key}" to localStorage. Cloud sync and React state remain active.`, finalErr);
+          return false;
+        }
+      }
+    } else {
+      console.warn(`[SafeStorage] Storage write error for "${key}":`, err);
+      return false;
+    }
+  }
+}
+
 export function saveServerQuotaToStorage(quotaBytes: number) {
-  localStorage.setItem(STORAGE_KEYS.SERVER_QUOTA, String(quotaBytes));
+  safeSetItem(STORAGE_KEYS.SERVER_QUOTA, String(quotaBytes));
 }
 
 export function formatBytes(bytes: number, decimals = 1): string {
@@ -378,7 +422,7 @@ export function loadUsersFromStorage(): User[] {
 }
 
 export function saveUsersToStorage(users: User[]) {
-  localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  safeSetItem(STORAGE_KEYS.USERS, JSON.stringify(users));
 }
 
 export function loadGalleriesFromStorage(): GallerySession[] {
@@ -392,11 +436,7 @@ export function loadGalleriesFromStorage(): GallerySession[] {
 }
 
 export function saveGalleriesToStorage(galleries: GallerySession[]) {
-  try {
-    localStorage.setItem(STORAGE_KEYS.GALLERIES, JSON.stringify(galleries));
-  } catch (err) {
-    console.warn('Notice: localStorage quota exceeded for galleries, using memory and cloud sync.', err);
-  }
+  safeSetItem(STORAGE_KEYS.GALLERIES, JSON.stringify(galleries));
 }
 
 export function loadImagesFromStorage(): GalleryImage[] {
@@ -416,10 +456,23 @@ export function loadImagesFromStorage(): GalleryImage[] {
 
 export function saveImagesToStorage(images: GalleryImage[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.IMAGES, JSON.stringify(images));
+    // Sanitize image array to prevent clogging localStorage:
+    // If photos have large base64 data URLs (> 50KB), omit the heavy URL in localStorage cache
+    // since InstantDB and React memory state retain the full high-resolution image data.
+    const sanitizedImages = images.slice(0, 100).map(img => {
+      if (img.url && img.url.startsWith('data:') && img.url.length > 50000) {
+        return {
+          ...img,
+          url: '',
+          highResUrl: '',
+        };
+      }
+      return img;
+    });
+
+    safeSetItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitizedImages));
   } catch (err) {
-    // If browser localStorage quota is reached, keep in React state and cloud sync without corrupting URLs
-    console.warn('Notice: browser localStorage quota reached; image cache skipped. In-memory state and cloud sync remain active.');
+    console.warn('Notice: browser localStorage quota reached; image cache skipped. In-memory state and cloud sync remain active.', err);
   }
 }
 
@@ -443,7 +496,8 @@ export function loadLogsFromStorage(): AuditLogItem[] {
 }
 
 export function saveLogsToStorage(logs: AuditLogItem[]) {
-  localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
+  // Cap logs to the most recent 40 items in localStorage to save quota
+  safeSetItem(STORAGE_KEYS.LOGS, JSON.stringify(logs.slice(0, 40)));
 }
 
 export function loadNotificationsFromStorage(): AppNotification[] {
@@ -457,7 +511,8 @@ export function loadNotificationsFromStorage(): AppNotification[] {
 }
 
 export function saveNotificationsToStorage(notifications: AppNotification[]) {
-  localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+  // Cap notifications to latest 25 items in localStorage
+  safeSetItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications.slice(0, 25)));
 }
 
 export function loadStoredAuthUser(): User | null {
@@ -472,8 +527,27 @@ export function loadStoredAuthUser(): User | null {
 
 export function saveStoredAuthUser(user: User | null) {
   if (user) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    safeSetItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
   } else {
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    } catch {}
+  }
+}
+
+/**
+ * Proactively cleans up stale or oversized caches from localStorage
+ * so normal operations and branding settings have plenty of space.
+ */
+export function cleanupStaleStorage() {
+  try {
+    const imagesCache = localStorage.getItem(STORAGE_KEYS.IMAGES);
+    if (imagesCache && imagesCache.length > 500000) {
+      // Images cache is larger than 500KB; purge it so it doesn't starve quota
+      localStorage.removeItem(STORAGE_KEYS.IMAGES);
+      console.log('[SafeStorage] Proactively purged heavy image cache from localStorage to keep app fast and stable.');
+    }
+  } catch (e) {
+    console.warn('[SafeStorage] Cleanup check notice:', e);
   }
 }

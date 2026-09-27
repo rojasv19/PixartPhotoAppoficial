@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de acción para restaurar las fotos originales y portadas en todas las galerías del estudio, añadir la herramienta de restauración en el panel de administración, y blindar la base de datos para que el encuadre jamás modifique URLs o portadas.",
-  "updatedAt":  "2026-09-26T19:31:19.462666970Z",
+  "summary":  "Plan de corrección para el error de cuota de localStorage ('somos_pixart_users_v5' y 'somos_pixart_branding_v3'). Incluye blindaje de todas las llamadas a setItem con try/catch, depuración automática de caché pesada de imágenes en base64, sincronización prioritaria con InstantDB en la nube y herramientas de recuperación de memoria en el panel del estudio.",
+  "updatedAt":  "2026-09-27T23:23:00.558768765Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

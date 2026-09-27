@@ -55,6 +55,7 @@ interface AdminDashboardProps {
   onBatchUpdateImagePosition?: (galleryId: string, position: string) => void;
   onBatchOptimizeImages: () => void;
   onReplyFeedback: (galleryId: string, feedbackId: string, replyText: string) => void;
+  onUpdateGalleryCoverPosition?: (galleryId: string, position: string) => void;
   onUpdateServerQuota?: (newQuotaBytes: number) => void;
   theme?: 'light' | 'dark';
 }
@@ -83,6 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onReplyFeedback,
   onUpdateImage,
   onBatchUpdateImagePosition,
+  onUpdateGalleryCoverPosition,
   onUpdateServerQuota,
   theme = 'dark',
 }) => {
@@ -240,6 +242,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDirectGalleryCoverPositionChange = (galleryId: string, position: string) => {
+    if (onUpdateGalleryCoverPosition) {
+      onUpdateGalleryCoverPosition(galleryId, position);
+      return;
+    }
     const targetGallery = galleries.find(g => g.id === galleryId);
     if (targetGallery) {
       onUpdateGallery({

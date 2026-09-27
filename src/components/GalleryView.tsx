@@ -24,6 +24,7 @@ interface GalleryViewProps {
   onToggleFavorite: (imageId: string) => void;
   onAddFeedback: (galleryId: string, feedback: Omit<FeedbackItem, 'id' | 'createdAt'>) => void;
   onUpdateGallery?: (updatedGallery: GallerySession) => void;
+  onUpdateGalleryCoverPosition?: (galleryId: string, position: string) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
   onBatchUpdateImagePosition?: (galleryId: string, position: string) => void;
   onDeleteImage?: (imageId: string) => void;
@@ -41,6 +42,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   onToggleFavorite,
   onAddFeedback,
   onUpdateGallery,
+  onUpdateGalleryCoverPosition,
   onUpdateImage,
   onBatchUpdateImagePosition,
   onDeleteImage,
@@ -398,14 +400,18 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
               {currentUser?.role === 'admin' && (
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  {onUpdateGallery && (
+                  {(onUpdateGalleryCoverPosition || onUpdateGallery) && (
                     <ImagePositionPicker
                       value={gallery.coverImagePosition || 'center'}
                       onChange={(newPos) => {
-                        onUpdateGallery({
-                          ...gallery,
-                          coverImagePosition: newPos,
-                        });
+                        if (onUpdateGalleryCoverPosition) {
+                          onUpdateGalleryCoverPosition(gallery.id, newPos);
+                        } else if (onUpdateGallery) {
+                          onUpdateGallery({
+                            ...gallery,
+                            coverImagePosition: newPos,
+                          });
+                        }
                       }}
                       onApplyToAll={onBatchUpdateImagePosition ? (newPos) => onBatchUpdateImagePosition(gallery.id, newPos) : undefined}
                       previewImageUrl={gallery.coverImage}

@@ -18,7 +18,9 @@ import {
   loadStoredAuthUser, saveStoredAuthUser,
   loadServerQuotaFromStorage, saveServerQuotaToStorage,
   calculateServerStats,
-  formatBytes
+  formatBytes,
+  cleanupStaleStorage,
+  safeSetItem
 } from './services/storageService';
 import {
   loadBrandingFromStorage,
@@ -94,8 +96,10 @@ export default function App() {
     }
   }, [deletedUserIds]);
 
-  // Sync / Seed initial data to InstantDB on first mount
+  // Sync / Seed initial data to InstantDB on first mount & clean up saturated local caches
   useEffect(() => {
+    // Proactively purge any oversized image caches from previous sessions
+    cleanupStaleStorage();
     // Proactively ensure defined admin users exist in InstantDB
     syncAdminUsersToDb().catch(err => console.error('Admin sync warning:', err));
   }, []);
@@ -339,7 +343,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('somos_pixart_theme', theme);
+    safeSetItem('somos_pixart_theme', theme);
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -351,33 +355,53 @@ export default function App() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Sync state changes to localStorage as backup
+  // Sync state changes to localStorage as backup (always protected against quota errors)
   useEffect(() => {
     if (users.length > 0) {
-      saveUsersToStorage(users);
+      try {
+        saveUsersToStorage(users);
+      } catch (err) {
+        console.warn('Notice: Local storage sync skipped for users:', err);
+      }
     }
   }, [users]);
 
   useEffect(() => {
     if (galleries.length > 0) {
-      saveGalleriesToStorage(galleries);
+      try {
+        saveGalleriesToStorage(galleries);
+      } catch (err) {
+        console.warn('Notice: Local storage sync skipped for galleries:', err);
+      }
     }
   }, [galleries]);
 
   useEffect(() => {
     if (images.length > 0) {
-      saveImagesToStorage(images);
+      try {
+        saveImagesToStorage(images);
+      } catch (err) {
+        console.warn('Notice: Local storage sync skipped for images:', err);
+      }
     }
   }, [images]);
 
   useEffect(() => {
     if (logs.length > 0) {
-      saveLogsToStorage(logs);
+      try {
+        saveLogsToStorage(logs);
+      } catch (err) {
+        console.warn('Notice: Local storage sync skipped for logs:', err);
+      }
     }
   }, [logs]);
 
   useEffect(() => {
-    saveStoredAuthUser(currentUser);
+    try {
+      saveStoredAuthUser(currentUser);
+    } catch (err) {
+      console.warn('Notice: Local storage sync skipped for auth user:', err);
+    }
   }, [currentUser]);
 
   const [serverQuotaBytes, setServerQuotaBytes] = useState<number>(() => loadServerQuotaFromStorage());
