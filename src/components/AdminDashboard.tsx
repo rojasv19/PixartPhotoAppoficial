@@ -566,8 +566,8 @@ interface PendingUploadItem {
           const naturalW = img.naturalWidth || img.width || 4000;
           const naturalH = img.naturalHeight || img.height || 3000;
 
-          // Downscale preview thumbnail to max 1280px to keep storage tiny (< 100KB per photo)
-          const maxDimension = 1280;
+          // Downscale preview thumbnail to max 1000px to keep storage tiny (~35KB per photo)
+          const maxDimension = 1000;
           let targetW = naturalW;
           let targetH = naturalH;
           if (targetW > maxDimension || targetH > maxDimension) {
@@ -587,7 +587,7 @@ interface PendingUploadItem {
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.drawImage(img, 0, 0, targetW, targetH);
-              const compressed = canvas.toDataURL('image/jpeg', 0.8);
+              const compressed = canvas.toDataURL('image/jpeg', 0.72);
               resolve({
                 thumbnailUrl: compressed,
                 width: naturalW,
@@ -1174,7 +1174,7 @@ interface PendingUploadItem {
                 </div>
                 <div className="space-y-1">
                   <h3 className={`text-2xl font-bold font-mono-code ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                    {images.length > 0 ? images.length : galleries.reduce((acc, g) => acc + (g.photoCount || 0), 0)} fotos
+                    {images.length} fotos
                   </h3>
                   <p className={`text-[11px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                     Distribuidas en {galleries.length} sesiones activas
@@ -1280,7 +1280,7 @@ interface PendingUploadItem {
                   {['boda', 'editorial', 'retrato', 'corporativo'].map((cat) => {
                     const catGalleries = galleries.filter(g => g.category === cat);
                     const catImages = images.filter(img => catGalleries.some(g => isSameId(g.id, img.galleryId) || (g.slug && isSameId(g.slug, img.galleryId))));
-                    const catTotalPhotos = catImages.length > 0 ? catImages.length : catGalleries.reduce((acc, g) => acc + (g.photoCount || 0), 0);
+                    const catTotalPhotos = catImages.length;
                     const catRawBytes = catImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
                     const catBytes = catRawBytes > 0 ? catRawBytes : catTotalPhotos * 3200000;
                     const catPercent = storageStats.usedBytes > 0 ? (catBytes / storageStats.usedBytes) * 100 : 0;
@@ -1485,7 +1485,7 @@ interface PendingUploadItem {
                         ((gal as any).originalLocalId && isSameId(i.galleryId, (gal as any).originalLocalId)) ||
                         (gal.title && i.galleryId?.trim().toLowerCase() === gal.title.trim().toLowerCase())
                       );
-                      const effectivePhotoCount = galImages.length > 0 ? galImages.length : (gal.photoCount || 0);
+                      const effectivePhotoCount = galImages.length;
                       const sizeBytes = galImages.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
 
                       return (
@@ -2025,7 +2025,7 @@ interface PendingUploadItem {
                         isDark ? 'bg-stone-950 border-stone-700 text-stone-200' : 'bg-white border-slate-300 text-slate-800'
                       }`}
                     >
-                      <option value="all">Todas las sesiones ({images.length > 0 ? images.length : galleries.reduce((acc, g) => acc + (g.photoCount || 0), 0)} fotos)</option>
+                      <option value="all">Todas las sesiones ({images.length} fotos)</option>
                       {galleries.map(g => {
                         const localCount = images.filter(i => 
                           isSameId(i.galleryId, g.id) || 
@@ -2033,7 +2033,7 @@ interface PendingUploadItem {
                           ((g as any).originalLocalId && isSameId(i.galleryId, (g as any).originalLocalId)) ||
                           (g.title && i.galleryId?.trim().toLowerCase() === g.title.trim().toLowerCase())
                         ).length;
-                        const count = localCount > 0 ? localCount : (g.photoCount || 0);
+                        const count = localCount;
                         return (
                           <option key={g.id} value={g.id}>
                             {g.title} ({count} fotos)

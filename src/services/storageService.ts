@@ -482,7 +482,9 @@ export function loadImagesFromStorage(): GalleryImage[] {
     if (data) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Only return images that actually have valid image URLs
+        const valid = parsed.filter(img => img && typeof img.url === 'string' && img.url.trim().length > 0);
+        if (valid.length > 0) return valid;
       }
     }
   } catch (e) {
@@ -494,35 +496,24 @@ export function loadImagesFromStorage(): GalleryImage[] {
 export function saveImagesToStorage(images: GalleryImage[]) {
   // Always persist all images to high-capacity IndexedDB (supports gigabytes and 700+ images without limits)
   if (Array.isArray(images) && images.length > 0) {
-    saveImagesBatchToIndexedDb(images).catch(err => {
-      console.error('[StorageService] Error saving images to IndexedDB:', err);
-    });
+    // Only persist images that have valid IDs
+    const validImages = images.filter(img => img && img.id);
+    if (validImages.length > 0) {
+      saveImagesBatchToIndexedDb(validImages).catch(err => {
+        console.error('[StorageService] Error saving images to IndexedDB:', err);
+      });
+    }
   }
 
   try {
-    // Try saving directly if payload is reasonable
+    // Only attempt localStorage caching if payload fits within safe quota limits (< 2MB)
+    // Never strip or empty out image URLs, as that causes blank renders
     const directPayload = JSON.stringify(images);
-    if (directPayload.length < 2500000) {
-      if (safeSetItem(STORAGE_KEYS.IMAGES, directPayload)) {
-        return;
-      }
+    if (directPayload.length < 2000000) {
+      safeSetItem(STORAGE_KEYS.IMAGES, directPayload);
     }
-
-    // If payload is larger than 2.5MB or safeSetItem hit a quota, sanitize heavy data URLs (> 200KB)
-    const sanitizedImages = images.map(img => {
-      if (img.url && img.url.startsWith('data:') && img.url.length > 200000) {
-        return {
-          ...img,
-          url: '',
-          highResUrl: '',
-        };
-      }
-      return img;
-    });
-
-    safeSetItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitizedImages));
   } catch (err) {
-    // Expected for massive image uploads; IndexedDB acts as the authoritative high-capacity store
+    // Expected for massive image uploads (700+ images); IndexedDB acts as the authoritative persistent store
   }
 }
 

@@ -38,6 +38,7 @@ import {
   seedInitialDataIfEmpty,
   createGalleryInDb,
   updateGalleryInDb,
+  updateGalleryPhotoCountInDb,
   deleteGalleryInDb,
   createUserInDb,
   updateUserInDb,
@@ -188,13 +189,24 @@ export default function App() {
       setCachedImages(prev => {
         const map = new Map<string, GalleryImage>();
         prev.forEach(img => map.set(img.id, img));
-        remoteImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+        remoteImgs.forEach(img => {
+          const existing = map.get(img.id);
+          const validUrl = (img.url && img.url.trim() !== '') ? img.url : (existing?.url || '');
+          const validHighRes = (img.highResUrl && img.highResUrl.trim() !== '') 
+            ? img.highResUrl 
+            : (existing?.highResUrl || validUrl);
+          
+          map.set(img.id, {
+            ...existing,
+            ...img,
+            url: validUrl,
+            highResUrl: validHighRes,
+          });
+        });
         const merged = Array.from(map.values());
         saveImagesToStorage(merged);
         return merged;
       });
-      // Keep high-capacity IndexedDB synchronized with remote photos
-      saveImagesBatchToIndexedDb(remoteImgs).catch(err => console.warn('IndexedDB remote sync warning:', err));
     }
   }, [imagesDbData?.images]);
 
@@ -208,13 +220,23 @@ export default function App() {
         setLocalImages(prev => {
           const map = new Map<string, GalleryImage>();
           prev.forEach(img => map.set(img.id, img));
-          storedImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+          storedImgs.forEach(img => {
+            const existing = map.get(img.id);
+            const validUrl = (img.url && img.url.trim() !== '') ? img.url : (existing?.url || '');
+            const validHighRes = (img.highResUrl && img.highResUrl.trim() !== '') ? img.highResUrl : (existing?.highResUrl || validUrl);
+            map.set(img.id, { ...existing, ...img, url: validUrl, highResUrl: validHighRes });
+          });
           return Array.from(map.values());
         });
         setCachedImages(prev => {
           const map = new Map<string, GalleryImage>();
           prev.forEach(img => map.set(img.id, img));
-          storedImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+          storedImgs.forEach(img => {
+            const existing = map.get(img.id);
+            const validUrl = (img.url && img.url.trim() !== '') ? img.url : (existing?.url || '');
+            const validHighRes = (img.highResUrl && img.highResUrl.trim() !== '') ? img.highResUrl : (existing?.highResUrl || validUrl);
+            map.set(img.id, { ...existing, ...img, url: validUrl, highResUrl: validHighRes });
+          });
           return Array.from(map.values());
         });
       }
@@ -327,6 +349,70 @@ export default function App() {
     );
   }, [dbData?.users, localUsers, deletedUserIds]);
 
+  // Complete accumulated merge of all image sources: IndexedDB cache + local in-memory + InstantDB remote
+  const images: GalleryImage[] = useMemo(() => {
+    const map = new Map<string, GalleryImage>();
+
+    // 1. Add all images persisted in IndexedDB
+    for (const img of cachedImages) {
+      if (img && img.id && !isImageDeleted(img.id) && !isGalleryDeleted(img.galleryId)) {
+        map.set(img.id, img);
+      }
+    }
+
+    // 2. Add / merge all in-memory local images
+    for (const img of localImages) {
+      if (img && img.id && !isImageDeleted(img.id) && !isGalleryDeleted(img.galleryId)) {
+        const existing = map.get(img.id);
+        const validUrl = (img.url && img.url.trim() !== '') ? img.url : (existing?.url || '');
+        const validHighRes = (img.highResUrl && img.highResUrl.trim() !== '') ? img.highResUrl : (existing?.highResUrl || validUrl);
+        map.set(img.id, { 
+          ...existing, 
+          ...img,
+          url: validUrl,
+          highResUrl: validHighRes,
+        });
+      }
+    }
+
+    // 3. Add / merge remote images from InstantDB
+    if (imagesDbData?.images && Array.isArray(imagesDbData.images)) {
+      for (const rawRemote of (imagesDbData.images as unknown as GalleryImage[])) {
+        if (rawRemote && rawRemote.id && !isImageDeleted(rawRemote.id) && !isGalleryDeleted(rawRemote.galleryId)) {
+          const existingKey = Array.from(map.keys()).find(k => isSameId(k, rawRemote.id));
+          const existing = existingKey ? map.get(existingKey) : undefined;
+          const targetKey = existingKey || rawRemote.id;
+
+          const validUrl = (rawRemote.url && rawRemote.url.trim() !== '') ? rawRemote.url : (existing?.url || '');
+          const validHighRes = (rawRemote.highResUrl && rawRemote.highResUrl.trim() !== '') 
+            ? rawRemote.highResUrl 
+            : (existing?.highResUrl || validUrl);
+
+          const merged: GalleryImage = {
+            ...existing,
+            ...rawRemote,
+            galleryId: rawRemote.galleryId || existing?.galleryId,
+            url: validUrl,
+            highResUrl: validHighRes,
+            imagePosition: rawRemote.imagePosition || existing?.imagePosition || 'center',
+            favoriteByUsers: Array.isArray(rawRemote.favoriteByUsers) && rawRemote.favoriteByUsers.length > 0 
+              ? rawRemote.favoriteByUsers 
+              : (existing?.favoriteByUsers || []),
+            tags: Array.isArray(rawRemote.tags) && rawRemote.tags.length > 0 
+              ? rawRemote.tags 
+              : (existing?.tags || []),
+            isFinalSelection: rawRemote.isFinalSelection ?? existing?.isFinalSelection ?? false,
+            excludeWatermark: rawRemote.excludeWatermark ?? existing?.excludeWatermark ?? false,
+          };
+
+          map.set(targetKey, merged);
+        }
+      }
+    }
+
+    return Array.from(map.values());
+  }, [imagesDbData?.images, cachedImages, localImages, isImageDeleted, isGalleryDeleted]);
+
   const galleries: GallerySession[] = useMemo(() => {
     const rawGals: GallerySession[] = (dbData?.galleries && dbData.galleries.length > 0)
       ? (dbData.galleries as unknown as GallerySession[])
@@ -345,9 +431,17 @@ export default function App() {
       .map(g => {
         const local = localGalleries.find(l => isSameId(l.id, g.id) || (l.title && g.title && l.title.trim().toLowerCase() === g.title.trim().toLowerCase()));
         const initial = INITIAL_GALLERIES.find(ig => isSameId(ig.id, g.id));
-        const effectiveCount = (g.photoCount !== undefined && g.photoCount > 0)
-          ? g.photoCount
-          : (local?.photoCount && local.photoCount > 0 ? local.photoCount : (initial?.photoCount ?? 0));
+        
+        // Authoritative count of actual pictures available in the gallery
+        const realCount = images.filter(img => 
+          isSameId(img.galleryId, g.id) ||
+          (g.slug && isSameId(img.galleryId, g.slug)) ||
+          ((g as any).originalLocalId && isSameId(img.galleryId, (g as any).originalLocalId)) ||
+          (g.title && img.galleryId?.trim().toLowerCase() === g.title.trim().toLowerCase())
+        ).length;
+
+        // Never display phantom counts: always use real matching photos
+        const photoCount = realCount;
 
         return {
           ...g,
@@ -359,13 +453,11 @@ export default function App() {
           clientIds: Array.isArray(g.clientIds) && g.clientIds.length > 0 ? g.clientIds : (local?.clientIds || initial?.clientIds || []),
           clientNames: Array.isArray(g.clientNames) && g.clientNames.length > 0 ? g.clientNames : (local?.clientNames || initial?.clientNames || []),
           feedbackList: Array.isArray(g.feedbackList) && g.feedbackList.length > 0 ? g.feedbackList : (local?.feedbackList || []),
-          photoCount: effectiveCount,
+          photoCount,
           originalLocalId: local?.id,
         };
       });
 
-    // In any browser, dbData.galleries is the sole source of truth once loaded.
-    // Only if dbData is still initial loading without any galleries do we fallback to INITIAL_GALLERIES / localGalleries.
     const missingLocals = (!dbData?.galleries || dbData.galleries.length === 0)
       ? localGalleries.filter(local => 
           !isGalleryDeleted(local.id) &&
@@ -377,40 +469,24 @@ export default function App() {
       : [];
 
     return [...mergedDbGals, ...missingLocals];
-  }, [dbData?.galleries, localGalleries, isGalleryDeleted]);
+  }, [dbData?.galleries, localGalleries, isGalleryDeleted, images]);
 
-  const images: GalleryImage[] = useMemo(() => {
-    // Prefer remote images if present, otherwise use cachedImages (retaining previous query results if query is refreshing)
-    const baseList: GalleryImage[] = (imagesDbData?.images && imagesDbData.images.length > 0)
-      ? (imagesDbData.images as unknown as GalleryImage[])
-      : (cachedImages.length > 0 ? cachedImages : localImages);
-
-    const mergedDbImages = baseList
-      .filter(img => !isImageDeleted(img.id) && !isGalleryDeleted(img.galleryId))
-      .map(img => {
-        const local = localImages.find(l => isSameId(l.id, img.id));
-        return {
-          ...img,
-          galleryId: img.galleryId || local?.galleryId,
-          url: img.url || local?.url || '',
-          highResUrl: img.highResUrl || local?.highResUrl || img.url || '',
-          imagePosition: img.imagePosition || local?.imagePosition || 'center',
-          favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : (local?.favoriteByUsers || []),
-          tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
-          isFinalSelection: img.isFinalSelection ?? local?.isFinalSelection ?? false,
-          excludeWatermark: img.excludeWatermark ?? local?.excludeWatermark ?? false,
-        };
-      });
-
-    // Preserve local images not yet reflected in dbData, excluding any deleted images or images of deleted galleries
-    const missingLocals = localImages.filter(local => 
-      !isImageDeleted(local.id) &&
-      !isGalleryDeleted(local.galleryId) &&
-      !mergedDbImages.some(di => isSameId(di.id, local.id))
-    );
-
-    return [...mergedDbImages, ...missingLocals];
-  }, [imagesDbData?.images, cachedImages, localImages, isImageDeleted, isGalleryDeleted]);
+  // Reconcile and fix any stale phantom photo counts in InstantDB
+  useEffect(() => {
+    if (!isDbLoading && dbData?.galleries && Array.isArray(dbData.galleries)) {
+      for (const rawGal of dbData.galleries) {
+        const gal = rawGal as unknown as GallerySession;
+        const realCount = images.filter(img => 
+          isSameId(img.galleryId, gal.id) ||
+          (gal.slug && isSameId(img.galleryId, gal.slug)) ||
+          (gal.title && typeof img.galleryId === 'string' && img.galleryId.trim().toLowerCase() === gal.title.trim().toLowerCase())
+        ).length;
+        if (typeof gal.photoCount === 'number' && gal.photoCount !== realCount) {
+          updateGalleryPhotoCountInDb(gal.id, realCount).catch(() => {});
+        }
+      }
+    }
+  }, [isDbLoading, dbData?.galleries, images]);
 
   const logs: AuditLogItem[] = useMemo(() => {
     if (dbData?.logs && dbData.logs.length > 0) {
@@ -1274,15 +1350,26 @@ export default function App() {
     await saveImagesBatchToIndexedDb(newImages);
 
     // 2. Immediately update in-memory state and cache
-    setLocalImages(prev => [...newImages, ...prev]);
+    setLocalImages(prev => {
+      const next = [...newImages, ...prev];
+      saveImagesToStorage(next);
+      return next;
+    });
     setCachedImages(prev => [...newImages, ...prev]);
 
     // 3. Update parent gallery photo count and cover
     if (parentGal) {
-      const currentCount = parentGal.photoCount || 0;
+      const existingMatchingPhotos = images.filter(img => 
+        isSameId(img.galleryId, targetGalleryId) ||
+        (parentGal.slug && isSameId(img.galleryId, parentGal.slug)) ||
+        (parentGal.title && img.galleryId?.trim().toLowerCase() === parentGal.title.trim().toLowerCase())
+      ).length;
+
+      const finalCount = existingMatchingPhotos + newImages.length;
+
       handleUpdateGallery({
         ...parentGal,
-        photoCount: currentCount + newImages.length,
+        photoCount: finalCount,
         coverImage: (!parentGal.coverImage || parentGal.coverImage.trim() === '') ? newImages[0]?.url : parentGal.coverImage,
       });
     }
@@ -1391,8 +1478,16 @@ export default function App() {
     addAuditLog('Optimización de Almacenamiento', `Ejecutó optimización WebP en lote reduciendo el consumo de disco del servidor.`);
   };
 
-  // Current active gallery for single gallery view
-  const activeGallery = galleries.find(g => g.id === selectedGalleryId || toUuid(g.id) === toUuid(selectedGalleryId || '')) || galleries[0];
+  // Current active gallery for single gallery view with resilient slug, title and UUID matching
+  const activeGallery = useMemo(() => {
+    if (!selectedGalleryId) return galleries[0];
+    return galleries.find(g => 
+      isSameId(g.id, selectedGalleryId) || 
+      (g.slug && isSameId(g.slug, selectedGalleryId)) || 
+      ((g as any).originalLocalId && isSameId((g as any).originalLocalId, selectedGalleryId)) ||
+      (g.title && selectedGalleryId && g.title.trim().toLowerCase() === selectedGalleryId.trim().toLowerCase())
+    ) || galleries[0];
+  }, [galleries, selectedGalleryId]);
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${

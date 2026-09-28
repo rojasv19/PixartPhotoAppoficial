@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan integral de solución para la carga masiva y persistencia de cientos de imágenes (más de 700 fotos): almacenamiento ilimitado con IndexedDB para evitar el límite de 5MB de localStorage, eliminación de la purga destructiva de caché, y canalización de subida por lotes (batches) a InstantDB con barra de progreso detallada y reintentos.",
-  "updatedAt":  "2026-09-28T17:48:55.557073731Z",
+  "summary":  "Plan de corrección inmediata para solucionar el contador fantasma (de 16 a 40) y la visibilidad de las fotografías en la galería: unificación total del array de imágenes combinando IndexedDB, memoria local e InstantDB sin exclusiones, ajuste del tamaño de lote para subidas en InstantDB (evitando desconexiones por frames grandes de WebSocket), sincronización del contador con las imágenes reales y resolución flexible de IDs de galería.",
+  "updatedAt":  "2026-09-28T18:36:19.749615804Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -133,7 +133,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     );
   }, [images, gallery.id, gallery.slug, (gallery as any).originalLocalId, gallery.title]);
 
-  const effectivePhotoCount = galleryImages.length > 0 ? galleryImages.length : (gallery.photoCount || 0);
+  const effectivePhotoCount = galleryImages.length;
 
   const effectiveUserId = useMemo(() => {
     return currentUser?.id || gallery.clientIds?.[0] || 'usr-guest';
@@ -884,9 +884,15 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   className="relative aspect-[4/3] w-full overflow-hidden bg-slate-900 cursor-pointer"
                 >
                   <img
-                    src={image.url}
+                    src={image.url || 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=1000&q=75'}
                     alt={image.title}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('unsplash.com')) {
+                        target.src = 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=1000&q=75';
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     loading="lazy"
                     style={{

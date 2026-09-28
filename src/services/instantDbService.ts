@@ -362,6 +362,15 @@ export async function updateGalleryInDb(gallery: GallerySession) {
   ]);
 }
 
+export async function updateGalleryPhotoCountInDb(galleryId: string, photoCount: number) {
+  const galleryUuid = toUuid(galleryId);
+  return db.transact([
+    tx.galleries[galleryUuid].update({
+      photoCount: Math.max(0, photoCount),
+    })
+  ]);
+}
+
 export async function deleteGalleryInDb(galleryId: string, relatedImageIds: string[] = []) {
   const galleryUuid = toUuid(galleryId);
   const mutations = [tx.galleries[galleryUuid].delete()];
@@ -470,7 +479,8 @@ export async function uploadImagesBatchToDb(
 ): Promise<{ success: number; failed: number }> {
   if (!images || images.length === 0) return { success: 0, failed: 0 };
 
-  const CHUNK_SIZE = 25;
+  // Chunk into micro-batches of 4 images so that base64 previews never exceed WebSocket frame quotas
+  const CHUNK_SIZE = 4;
   const chunks: GalleryImage[][] = [];
   for (let i = 0; i < images.length; i += CHUNK_SIZE) {
     chunks.push(images.slice(i, i + CHUNK_SIZE));

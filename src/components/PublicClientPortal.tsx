@@ -280,7 +280,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
               (gallery.title && img.galleryId?.trim().toLowerCase() === gallery.title.trim().toLowerCase())
             );
 
-            const effectivePhotoCount = galleryImages.length > 0 ? galleryImages.length : (gallery.photoCount || 0);
+            const effectivePhotoCount = galleryImages.length;
 
             return (
               <div

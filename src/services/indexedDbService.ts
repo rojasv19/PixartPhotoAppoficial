@@ -133,7 +133,21 @@ export async function saveImagesBatchToIndexedDb(images: GalleryImage[]): Promis
 
       for (const img of images) {
         if (img && img.id) {
-          store.put(img);
+          if (img.url && img.url.trim() !== '') {
+            store.put(img);
+          } else {
+            // Incoming image has empty URL: check if IndexedDB already has the image with a valid URL
+            const getReq = store.get(img.id);
+            getReq.onsuccess = () => {
+              const existing = getReq.result as GalleryImage | undefined;
+              store.put({
+                ...existing,
+                ...img,
+                url: existing?.url || img.url || '',
+                highResUrl: existing?.highResUrl || img.highResUrl || existing?.url || '',
+              });
+            };
+          }
         }
       }
     });

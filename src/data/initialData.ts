@@ -112,7 +112,7 @@ export const INITIAL_GALLERIES: GallerySession[] = [
     createdAt: '2026-09-25',
     lastActivityAt: '2026-09-28',
     feedbackList: [],
-    photoCount: 130,
+    photoCount: 0,
   },
   {
     id: '8c21267c-3374-43d5-b302-f79786484824',
@@ -140,7 +140,7 @@ export const INITIAL_GALLERIES: GallerySession[] = [
     createdAt: '2026-09-26',
     lastActivityAt: '2026-09-28',
     feedbackList: [],
-    photoCount: 70,
+    photoCount: 0,
   },
   {
     id: '1639ca2f-c26d-4d57-8fb0-827648e1b5e3',
