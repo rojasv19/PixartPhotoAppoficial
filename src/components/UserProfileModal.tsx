@@ -9,6 +9,7 @@ import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { DEFAULT_PROFILE_AVATAR } from '../data/photographyAvatars';
 import { isSameId } from '../services/instantDbService';
 import { downloadSingleImage, downloadImagesAsZip, formatBytes } from '../services/storageService';
+import { getImagePositionStyle } from './ImagePositionPicker';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -589,6 +590,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           src={img.url} 
                           alt={img.title}
                           loading="lazy"
+                          style={{ objectPosition: getImagePositionStyle(img.imagePosition) }}
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

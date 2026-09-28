@@ -10,6 +10,7 @@ import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../servic
 import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { isSameId } from '../services/instantDbService';
 import { WatermarkOverlay } from './WatermarkOverlay';
+import { ImagePositionPicker, getImagePositionStyle } from './ImagePositionPicker';
 
 interface AdminFavoritesViewProps {
   galleries: GallerySession[];
@@ -894,6 +895,7 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                     src={image.url}
                     alt={image.title}
                     referrerPolicy="no-referrer"
+                    style={{ objectPosition: getImagePositionStyle(image.imagePosition) }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
 
@@ -1058,6 +1060,35 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
                     />
                   </div>
 
+                  {/* Framing / Encuadre Selector */}
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                    isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+                        Encuadre / Posición:
+                      </span>
+                    </div>
+                    {onUpdateImage ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <ImagePositionPicker
+                          value={image.imagePosition || 'center'}
+                          onChange={(newPos) => {
+                            onUpdateImage({ ...image, imagePosition: newPos });
+                          }}
+                          previewImageUrl={image.url}
+                          label="Encuadre"
+                          theme={theme}
+                          compact
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {image.imagePosition || 'Centro'}
+                      </span>
+                    )}
+                  </div>
+
                   {/* Card Action Footer */}
                   <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2">
@@ -1173,8 +1204,27 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
               })()}
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
-              <span className="font-mono-code">{previewImage.width} × {previewImage.height} px • {formatBytes(previewImage.fileSizeBytes)}</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 pt-2 border-t border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="font-mono-code">{previewImage.width} × {previewImage.height} px • {formatBytes(previewImage.fileSizeBytes)}</span>
+                {onUpdateImage && (
+                  <div className="flex items-center gap-1.5 pl-3 border-l border-slate-700">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Encuadre:</span>
+                    <ImagePositionPicker
+                      value={previewImage.imagePosition || 'center'}
+                      onChange={(newPos) => {
+                        const updated = { ...previewImage, imagePosition: newPos };
+                        setPreviewImage(updated);
+                        onUpdateImage(updated);
+                      }}
+                      previewImageUrl={previewImage.url}
+                      label="Encuadre"
+                      theme={theme}
+                      compact
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => {
                   const parentGal = galleries.find(g => g.id === previewImage.galleryId);

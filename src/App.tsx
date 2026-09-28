@@ -190,7 +190,7 @@ export default function App() {
 
   const galleries: GallerySession[] = useMemo(() => {
     if (dbData?.galleries && dbData.galleries.length > 0) {
-      return (dbData.galleries as unknown as GallerySession[]).map(g => {
+      const mergedDbGals = (dbData.galleries as unknown as GallerySession[]).map(g => {
         const local = localGalleries.find(l => isSameId(l.id, g.id));
         const initial = INITIAL_GALLERIES.find(ig => isSameId(ig.id, g.id));
         return {
@@ -202,13 +202,20 @@ export default function App() {
           feedbackList: Array.isArray(g.feedbackList) ? g.feedbackList : (local?.feedbackList || []),
         };
       });
+
+      // Preserve any local galleries not yet reflected in dbData
+      const missingLocals = localGalleries.filter(local => 
+        !mergedDbGals.some(dg => isSameId(dg.id, local.id))
+      );
+
+      return [...mergedDbGals, ...missingLocals];
     }
     return localGalleries;
   }, [dbData?.galleries, localGalleries]);
 
   const images: GalleryImage[] = useMemo(() => {
     if (dbData?.images && dbData.images.length > 0) {
-      return (dbData.images as unknown as GalleryImage[]).map(img => {
+      const mergedDbImages = (dbData.images as unknown as GalleryImage[]).map(img => {
         const local = localImages.find(l => isSameId(l.id, img.id));
         const initial = INITIAL_IMAGES.find(ii => isSameId(ii.id, img.id));
         return {
@@ -220,6 +227,13 @@ export default function App() {
           tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
         };
       });
+
+      // Preserve any local images not yet reflected in dbData (e.g. freshly uploaded or cached photos)
+      const missingLocals = localImages.filter(local => 
+        !mergedDbImages.some(di => isSameId(di.id, local.id))
+      );
+
+      return [...mergedDbImages, ...missingLocals];
     }
     return localImages;
   }, [dbData?.images, localImages]);

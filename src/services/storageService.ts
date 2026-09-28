@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, AppNotification } from '../types';
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
+import { isSameId } from './instantDbService';
 
 const STORAGE_KEYS = {
   USERS: 'somos_pixart_users_v5',
@@ -86,7 +87,7 @@ export function formatBytes(bytes: number, decimals = 1): string {
 }
 
 export function calculateGallerySize(galleryId: string, images: GalleryImage[]): { totalBytes: number; optimizedBytes: number; imageCount: number } {
-  const galleryImages = images.filter(img => img.galleryId === galleryId);
+  const galleryImages = images.filter(img => isSameId(img.galleryId, galleryId));
   const totalBytes = galleryImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
   const optimizedBytes = galleryImages.reduce((acc, img) => acc + (img.optimized ? (img.compressedSizeBytes || img.fileSizeBytes * 0.18) : img.fileSizeBytes), 0);
   return {
@@ -459,7 +460,7 @@ export function saveImagesToStorage(images: GalleryImage[]) {
     // Sanitize image array to prevent clogging localStorage:
     // If photos have large base64 data URLs (> 50KB), omit the heavy URL in localStorage cache
     // since InstantDB and React memory state retain the full high-resolution image data.
-    const sanitizedImages = images.slice(0, 100).map(img => {
+    const sanitizedImages = images.map(img => {
       if (img.url && img.url.startsWith('data:') && img.url.length > 50000) {
         return {
           ...img,

@@ -15,6 +15,7 @@ import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
 import { extractExifFromFile } from '../services/exifService';
 import { ImagePositionPicker, getImagePositionStyle, getImagePositionLabel } from './ImagePositionPicker';
+import { isSameId } from '../services/instantDbService';
 
 interface AdminDashboardProps {
   initialTab?: 'overview' | 'galleries' | 'favorites' | 'clients' | 'storage' | 'permissions' | 'branding';
@@ -296,7 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const filteredInspectorImages = useMemo(() => {
     if (photoFilterGalleryId === 'all') return images;
-    return images.filter(i => i.galleryId === photoFilterGalleryId);
+    return images.filter(i => isSameId(i.galleryId, photoFilterGalleryId));
   }, [images, photoFilterGalleryId]);
 
   // Storage Stats Summary
@@ -1394,7 +1395,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     isDark ? 'divide-stone-800/60' : 'divide-slate-200'
                   }`}>
                     {galleries.map((gal) => {
-                      const galImages = images.filter(i => i.galleryId === gal.id);
+                      const galImages = images.filter(i => isSameId(i.galleryId, gal.id));
                       const sizeBytes = galImages.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
 
                       return (
@@ -1936,7 +1937,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     >
                       <option value="all">Todas las sesiones ({images.length} fotos)</option>
                       {galleries.map(g => {
-                        const count = images.filter(i => i.galleryId === g.id).length;
+                        const count = images.filter(i => isSameId(i.galleryId, g.id)).length;
                         return (
                           <option key={g.id} value={g.id}>
                             {g.title} ({count} fotos)
@@ -3339,19 +3340,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Upload Modal Tabs: "Imágenes sin edición" vs "Selección Final" */}
-            <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-stone-950/70 border border-stone-800">
+            <div className={`grid grid-cols-2 gap-2 p-1.5 rounded-2xl border transition-colors ${
+              isDark 
+                ? 'bg-stone-950/90 border-stone-700/80 shadow-inner' 
+                : 'bg-slate-200/90 border-slate-300 shadow-inner'
+            }`}>
               <button
                 type="button"
                 id="upload-tab-raw-btn"
                 onClick={() => setUploadTab('raw')}
                 className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   uploadTab === 'raw'
-                    ? `${colorTheme.twBg} text-white shadow-md shadow-blue-600/20`
-                    : isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 border border-blue-400/60 ring-1 ring-blue-300/40 font-extrabold'
+                    : isDark 
+                      ? 'text-stone-300 hover:text-white hover:bg-stone-800/80' 
+                      : 'text-slate-700 hover:text-slate-950 hover:bg-white/90'
                 }`}
               >
-                <Camera className="w-4 h-4" />
-                <span>Imágenes sin edición</span>
+                <Camera className={`w-4 h-4 ${uploadTab === 'raw' ? 'text-white' : isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                <span className={uploadTab === 'raw' ? 'text-white tracking-wide' : ''}>Imágenes sin edición</span>
               </button>
 
               <button
@@ -3360,33 +3367,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 onClick={() => setUploadTab('final')}
                 className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   uploadTab === 'final'
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30'
-                    : isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/30 border border-emerald-400/60 ring-1 ring-emerald-300/40 font-extrabold'
+                    : isDark 
+                      ? 'text-stone-300 hover:text-white hover:bg-stone-800/80' 
+                      : 'text-slate-700 hover:text-slate-950 hover:bg-white/90'
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-emerald-300" />
-                <span>Selección Final</span>
+                <Sparkles className={`w-4 h-4 ${uploadTab === 'final' ? 'text-emerald-100' : isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                <span className={uploadTab === 'final' ? 'text-white tracking-wide' : ''}>Selección Final</span>
               </button>
             </div>
 
             {/* Helper Banner for active upload tab */}
-            <div className={`p-3 rounded-xl text-xs flex items-center gap-2.5 border ${
+            <div className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 border transition-all ${
               uploadTab === 'final'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : isDark ? 'bg-stone-900/80 border-stone-800 text-stone-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                ? isDark 
+                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-100 shadow-xs' 
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-xs'
+                : isDark 
+                  ? 'bg-blue-950/60 border-blue-500/40 text-blue-100 shadow-xs' 
+                  : 'bg-blue-50 border-blue-300 text-blue-950 shadow-xs'
             }`}>
               {uploadTab === 'final' ? (
                 <>
-                  <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <Sparkles className="w-4 h-4 text-emerald-300 shrink-0" />
                   <span>
-                    <strong>Selección Final:</strong> Las fotografías subidas aquí se mostrarán directamente en la pestaña <em>Selección Final</em> de la galería y en el perfil del cliente, con descarga autorizada en máxima resolución por defecto.
+                    <strong className="font-bold underline decoration-emerald-400/50">Selección Final:</strong> Las fotografías subidas aquí se mostrarán directamente en la pestaña <em>Selección Final</em> de la galería y en el perfil del cliente, con descarga autorizada en máxima resolución por defecto.
                   </span>
                 </>
               ) : (
                 <>
-                  <Camera className="w-4 h-4 text-blue-400 shrink-0" />
+                  <Camera className="w-4 h-4 text-blue-300 shrink-0" />
                   <span>
-                    <strong>Imágenes sin edición:</strong> Fotografías en bruto para revisión general, filtrado y preselección de favoritas por parte del cliente.
+                    <strong className="font-bold underline decoration-blue-400/50">Imágenes sin edición:</strong> Fotografías en bruto para revisión general, filtrado y preselección de favoritas por parte del cliente.
                   </span>
                 </>
               )}
@@ -3514,9 +3527,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                               {/* Real Resolution Badge */}
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                                isDark ? 'bg-stone-800/80 text-blue-300 border-blue-500/20' : 'bg-blue-50 text-blue-800 border-blue-200'
+                                isDark ? 'bg-blue-950/80 text-blue-200 border-blue-500/40 shadow-xs' : 'bg-blue-100 text-blue-900 border-blue-300 shadow-xs'
                               }`}>
-                                <Camera className="w-3 h-3 text-blue-400 shrink-0" />
+                                <Camera className="w-3 h-3 text-blue-300 shrink-0" />
                                 <span>{item.width} × {item.height} px</span>
                               </span>
 
@@ -3930,7 +3943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* Details */}
             {(() => {
-              const galImgs = images.filter(i => i.galleryId === galleryToEmptyPhotos.id);
+              const galImgs = images.filter(i => isSameId(i.galleryId, galleryToEmptyPhotos.id));
               const totalBytes = galImgs.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
               return (
                 <div className={`p-4 rounded-2xl border space-y-2 text-xs ${

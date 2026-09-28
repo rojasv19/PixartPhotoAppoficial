@@ -11,6 +11,7 @@ import { BrandIcon } from './BrandIcon';
 import { LockedGalleryModal } from './LockedGalleryModal';
 import { typographyToStyle } from '../services/googleFontsService';
 import { getImagePositionStyle } from './ImagePositionPicker';
+import { isSameId } from '../services/instantDbService';
 
 interface PublicClientPortalProps {
   currentUser: User | null;
@@ -74,7 +75,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
   };
 
   const handleUnlockPin = (galleryId: string, pin: string): boolean => {
-    const target = galleries.find(g => g.id === galleryId);
+    const target = galleries.find(g => isSameId(g.id, galleryId));
     if (!target) return false;
     
     // Check against session PIN or default studio master PINs
@@ -272,7 +273,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
         {/* Galleries Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGalleries.map(gallery => {
-            const galleryImages = images.filter(img => img.galleryId === gallery.id);
+            const galleryImages = images.filter(img => isSameId(img.galleryId, gallery.id));
 
             return (
               <div

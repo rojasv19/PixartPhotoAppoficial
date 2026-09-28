@@ -124,7 +124,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   // Gallery specific images
   const galleryImages = useMemo(() => {
-    return images.filter(img => img.galleryId === gallery.id);
+    return images.filter(img => isSameId(img.galleryId, gallery.id));
   }, [images, gallery.id]);
 
   const effectiveUserId = useMemo(() => {
