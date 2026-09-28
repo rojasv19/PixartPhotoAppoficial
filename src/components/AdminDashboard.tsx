@@ -1098,7 +1098,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div className="space-y-1">
                   <h3 className={`text-2xl font-bold font-mono-code ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                    {images.length} fotos
+                    {images.length > 0 ? images.length : galleries.reduce((acc, g) => acc + (g.photoCount || 0), 0)} fotos
                   </h3>
                   <p className={`text-[11px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                     Distribuidas en {galleries.length} sesiones activas
@@ -1203,8 +1203,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="space-y-4">
                   {['boda', 'editorial', 'retrato', 'corporativo'].map((cat) => {
                     const catGalleries = galleries.filter(g => g.category === cat);
-                    const catImages = images.filter(img => catGalleries.some(g => g.id === img.galleryId));
-                    const catBytes = catImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
+                    const catImages = images.filter(img => catGalleries.some(g => isSameId(g.id, img.galleryId) || (g.slug && isSameId(g.slug, img.galleryId))));
+                    const catTotalPhotos = catImages.length > 0 ? catImages.length : catGalleries.reduce((acc, g) => acc + (g.photoCount || 0), 0);
+                    const catRawBytes = catImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
+                    const catBytes = catRawBytes > 0 ? catRawBytes : catTotalPhotos * 3200000;
                     const catPercent = storageStats.usedBytes > 0 ? (catBytes / storageStats.usedBytes) * 100 : 0;
 
                     return (
@@ -1216,7 +1218,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className={`w-2.5 h-2.5 rounded-full ${
                               cat === 'boda' ? 'bg-amber-400' : cat === 'editorial' ? 'bg-indigo-400' : cat === 'retrato' ? 'bg-rose-400' : 'bg-emerald-400'
                             }`} />
-                            {cat} ({catGalleries.length} sesiones, {catImages.length} fotos)
+                            {cat} ({catGalleries.length} sesiones, {catTotalPhotos} fotos)
                           </span>
                           <span className={`font-mono-code font-semibold ${
                             isDark ? 'text-stone-300' : 'text-slate-800'
@@ -1407,6 +1409,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         ((gal as any).originalLocalId && isSameId(i.galleryId, (gal as any).originalLocalId)) ||
                         (gal.title && i.galleryId?.trim().toLowerCase() === gal.title.trim().toLowerCase())
                       );
+                      const effectivePhotoCount = galImages.length > 0 ? galImages.length : (gal.photoCount || 0);
                       const sizeBytes = galImages.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
 
                       return (
@@ -1490,10 +1493,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className={`font-mono-code font-bold ${
                               isDark ? 'text-amber-300' : colorTheme.twText
                             }`}>
-                              {formatBytes(sizeBytes)}
+                              {sizeBytes > 0 ? formatBytes(sizeBytes) : (effectivePhotoCount > 0 ? `${effectivePhotoCount} fotos` : '0 B')}
                             </div>
                             <div className={`text-[11px] ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                              {galImages.length} archivos RAW/JPEG
+                              {effectivePhotoCount} archivos RAW/JPEG
                             </div>
                           </td>
 
@@ -1568,11 +1571,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </button>
 
                               {/* Empty Photos in this Session */}
-                              {galImages.length > 0 && onDeleteAllImagesInGallery && (
+                              {effectivePhotoCount > 0 && onDeleteAllImagesInGallery && (
                                 <button
                                   id={`empty-photos-gal-btn-${gal.id}`}
                                   onClick={() => setGalleryToEmptyPhotos(gal)}
-                                  title={`Vaciar todas las fotos (${galImages.length}) de esta sesión`}
+                                  title={`Vaciar todas las fotos (${effectivePhotoCount}) de esta sesión`}
                                   className={`p-2 rounded-lg transition-colors cursor-pointer ${
                                     isDark 
                                       ? 'bg-stone-800 hover:bg-amber-950/80 text-stone-400 hover:text-amber-400' 
@@ -1946,14 +1949,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         isDark ? 'bg-stone-950 border-stone-700 text-stone-200' : 'bg-white border-slate-300 text-slate-800'
                       }`}
                     >
-                      <option value="all">Todas las sesiones ({images.length} fotos)</option>
+                      <option value="all">Todas las sesiones ({images.length > 0 ? images.length : galleries.reduce((acc, g) => acc + (g.photoCount || 0), 0)} fotos)</option>
                       {galleries.map(g => {
-                        const count = images.filter(i => 
+                        const localCount = images.filter(i => 
                           isSameId(i.galleryId, g.id) || 
                           (g.slug && isSameId(i.galleryId, g.slug)) || 
                           ((g as any).originalLocalId && isSameId(i.galleryId, (g as any).originalLocalId)) ||
                           (g.title && i.galleryId?.trim().toLowerCase() === g.title.trim().toLowerCase())
                         ).length;
+                        const count = localCount > 0 ? localCount : (g.photoCount || 0);
                         return (
                           <option key={g.id} value={g.id}>
                             {g.title} ({count} fotos)

@@ -132,6 +132,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     );
   }, [images, gallery.id, gallery.slug, (gallery as any).originalLocalId, gallery.title]);
 
+  const effectivePhotoCount = galleryImages.length > 0 ? galleryImages.length : (gallery.photoCount || 0);
+
   const effectiveUserId = useMemo(() => {
     return currentUser?.id || gallery.clientIds?.[0] || 'usr-guest';
   }, [currentUser, gallery.clientIds]);
@@ -348,8 +350,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 }`}
               >
                 <Download className={`w-3.5 h-3.5 ${colorTheme.twText}`} />
-                <span className="hidden md:inline">Descargar Álbum ZIP ({galleryImages.length})</span>
-                <span className="md:hidden">ZIP ({galleryImages.length})</span>
+                <span className="hidden md:inline">Descargar Álbum ZIP ({effectivePhotoCount})</span>
+                <span className="md:hidden">ZIP ({effectivePhotoCount})</span>
               </button>
             )}
 
@@ -550,7 +552,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
               <div className="flex items-center gap-2">
                 <span className="text-slate-400 text-xs">Total Fotografías:</span>
-                <span className={`font-mono-code text-xs font-bold ${colorTheme.twText}`}>{galleryImages.length} fotos</span>
+                <span className={`font-mono-code text-xs font-bold ${colorTheme.twText}`}>{effectivePhotoCount} fotos</span>
               </div>
 
               <span className="text-slate-700">•</span>
@@ -596,7 +598,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                   : isDark ? 'bg-slate-850 text-slate-300 hover:bg-slate-800' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              Todas ({galleryImages.length})
+              Todas ({effectivePhotoCount})
             </button>
 
             <button

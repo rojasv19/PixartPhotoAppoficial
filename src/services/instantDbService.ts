@@ -50,13 +50,15 @@ export function isSameId(idA?: string | null, idB?: string | null): boolean {
 }
 
 /**
- * Ensures all defined INITIAL_USERS (especially administrators Maurely Carmona and Victor Rojas)
- * are synced and up-to-date in InstantDB with their latest passwords, roles, and profiles.
+ * Ensures only defined administrators (Maurely Carmona and Victor Rojas)
+ * are synced and up-to-date in InstantDB with their latest passwords and permissions.
+ * Never recreates demo users or clients.
  */
 export async function syncAdminUsersToDb() {
   try {
     const transactions = [];
     for (const u of INITIAL_USERS) {
+      if (u.role !== 'admin') continue;
       const userUuid = toUuid(u.id);
       const assignedUuids = (u.assignedGalleryIds || []).map(gid => toUuid(gid));
       transactions.push(
@@ -70,19 +72,60 @@ export async function syncAdminUsersToDb() {
           company: u.company || '',
           assignedGalleryIds: assignedUuids,
           status: u.status || 'active',
-          createdDate: u.createdDate || new Date().toISOString().split('T')[0],
+          createdDate: u.createdDate || '2026-01-15',
           lastLogin: u.lastLogin || '',
           notes: u.notes || '',
-          canDownloadHighRes: u.canDownloadHighRes ?? true,
-          canLeaveFeedback: u.canLeaveFeedback ?? true,
-          canSelectFavorites: u.canSelectFavorites ?? true,
+          canDownloadHighRes: true,
+          canLeaveFeedback: true,
+          canSelectFavorites: true,
         })
       );
     }
-    await db.transact(transactions);
+    if (transactions.length > 0) {
+      await db.transact(transactions);
+    }
     return true;
   } catch (err) {
     console.error('Error syncing admin users to InstantDB:', err);
+    return false;
+  }
+}
+
+/**
+ * Permanently deletes legacy test users and test galleries from InstantDB.
+ */
+export async function purgeLegacyDemoDataFromDb() {
+  try {
+    const legacyUserUuids = [
+      "ffd9e5fa-22ba-4e9a-8fd9-e5fa22bafe9a", // Isabella Fontana
+      "fad9de1b-23bb-402d-8ad9-de1b23bb002d", // Grupo Nexus Tech
+      "fcd9e141-21ba-4d07-8cd9-e14121bafd07", // Sofía & Mateo Valenzuela
+      "c65702f3-5b1b-4489-8657-02f35b1ba489", // Elena Vance
+      "f9d9dc88-20ba-4b74-89d9-dc8820bafb74", // Valeria Mendoza
+      toUuid("usr-client-1"),
+      toUuid("usr-client-2"),
+      toUuid("usr-client-3"),
+      toUuid("usr-client-4"),
+      toUuid("usr-photog-1"),
+    ];
+
+    const legacyGalleryUuids = [
+      toUuid("gal-wedding-1"),
+      toUuid("gal-editorial-2"),
+      toUuid("gal-portrait-3"),
+      toUuid("gal-corp-4"),
+    ];
+
+    const mutations = [
+      ...legacyUserUuids.map(uid => tx.users[uid].delete()),
+      ...legacyGalleryUuids.map(gid => tx.galleries[gid].delete()),
+    ];
+
+    await db.transact(mutations);
+    console.log('[InstantDB] Legacy demo users and galleries permanently purged');
+    return true;
+  } catch (e) {
+    console.warn('[InstantDB] Legacy purge notice:', e);
     return false;
   }
 }
@@ -95,7 +138,6 @@ export async function seedInitialDataIfEmpty(
   existingUsersCount: number
 ) {
   if (existingGalleriesCount > 0 && existingUsersCount > 0) {
-    // Even if existing users exist, make sure admin accounts are always synchronized
     syncAdminUsersToDb().catch(e => console.error(e));
     return false;
   }
@@ -273,6 +315,7 @@ export async function createGalleryInDb(gallery: GallerySession) {
       createdAt: gallery.createdAt,
       lastActivityAt: gallery.lastActivityAt,
       feedbackList: gallery.feedbackList || [],
+      photoCount: gallery.photoCount !== undefined ? gallery.photoCount : 0,
     })
   ]);
 }
@@ -314,6 +357,7 @@ export async function updateGalleryInDb(gallery: GallerySession) {
       createdAt: gallery.createdAt,
       lastActivityAt: gallery.lastActivityAt,
       feedbackList: gallery.feedbackList || [],
+      photoCount: gallery.photoCount !== undefined ? gallery.photoCount : 0,
     })
   ]);
 }

@@ -37,6 +37,7 @@ const _schema = i.schema({
       clientNames: i.json<string[]>().optional(),
       feedbackList: i.json<any[]>().optional(),
       coverImagePosition: i.string().optional(),
+      photoCount: i.number().optional(),
     }),
     images: i.entity({
       galleryId: i.string(),

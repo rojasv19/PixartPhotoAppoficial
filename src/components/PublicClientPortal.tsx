@@ -280,6 +280,8 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
               (gallery.title && img.galleryId?.trim().toLowerCase() === gallery.title.trim().toLowerCase())
             );
 
+            const effectivePhotoCount = galleryImages.length > 0 ? galleryImages.length : (gallery.photoCount || 0);
+
             return (
               <div
                 key={gallery.id}
@@ -357,7 +359,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
                         <span>{gallery.eventDate}</span>
                       </span>
                       <span>•</span>
-                      <span>{galleryImages.length} fotos</span>
+                      <span>{effectivePhotoCount} fotos</span>
                     </div>
 
                     <span className={`font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform ${colorTheme.twText}`}>

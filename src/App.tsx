@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { PublicClientPortal } from './components/PublicClientPortal';
 import { GalleryView } from './components/GalleryView';
@@ -9,6 +9,7 @@ import {
   GallerySession, GalleryImage, User, FeedbackItem, AuditLogItem, ServerStorageStats, StudioBrandingConfig, AppNotification 
 } from './types';
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES } from './data/initialData';
+import { DEFAULT_PROFILE_AVATAR } from './data/photographyAvatars';
 import { 
   loadUsersFromStorage, saveUsersToStorage,
   loadGalleriesFromStorage, saveGalleriesToStorage,
@@ -59,19 +60,43 @@ import {
   batchOptimizeImagesInDb,
   addAuditLogInDb,
   syncAdminUsersToDb,
+  purgeLegacyDemoDataFromDb,
   saveBrandingToDb
 } from './services/instantDbService';
 import { preloadFonts, typographyToStyle } from './services/googleFontsService';
 
 export default function App() {
-  // Query InstantDB in real-time
-  const { isLoading: isDbLoading, error: dbError, data: dbData } = db.useQuery({
+  // Query InstantDB with isolated subscriptions to prevent single large payload timeouts
+  // 1. Core lightweight subscription: Galleries, Users, and Studio Settings (instantaneous, never times out)
+  const { isLoading: isCoreLoading, error: coreDbError, data: coreDbData } = db.useQuery({
     galleries: {},
-    images: {},
     users: {},
-    logs: {},
     studioSettings: {},
   });
+
+  // 2. Images subscription (isolated so heavy photo sets do not block or timeout core entities)
+  const { isLoading: isImagesLoading, error: imagesDbError, data: imagesDbData } = db.useQuery({
+    images: {},
+  });
+
+  // 3. Audit logs subscription (isolated)
+  const { data: logsDbData } = db.useQuery({
+    logs: {},
+  });
+
+  // Synthesize unified dbData view for seamless compatibility
+  const dbData = useMemo(() => {
+    return {
+      galleries: coreDbData?.galleries || [],
+      users: coreDbData?.users || [],
+      studioSettings: coreDbData?.studioSettings || [],
+      images: imagesDbData?.images || [],
+      logs: logsDbData?.logs || [],
+    };
+  }, [coreDbData, imagesDbData, logsDbData]);
+
+  const isDbLoading = isCoreLoading;
+  const dbError = coreDbError || imagesDbError;
 
   // Local state cache / fallbacks
   const [localUsers, setLocalUsers] = useState<User[]>(() => loadUsersFromStorage());
@@ -98,10 +123,77 @@ export default function App() {
     }
   }, [deletedUserIds]);
 
+  // Track deleted gallery IDs so they never resurrect from demo data or remote cache
+  const [deletedGalleryIds, setDeletedGalleryIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('somos_pixart_deleted_galleries_v2');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('somos_pixart_deleted_galleries_v2', JSON.stringify(deletedGalleryIds));
+    } catch (e) {
+      console.warn('Notice: Could not save deletedGalleryIds:', e);
+    }
+  }, [deletedGalleryIds]);
+
+  // Track deleted image IDs so they never resurrect from cache
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('somos_pixart_deleted_images_v2');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('somos_pixart_deleted_images_v2', JSON.stringify(deletedImageIds));
+    } catch (e) {
+      console.warn('Notice: Could not save deletedImageIds:', e);
+    }
+  }, [deletedImageIds]);
+
+  const isGalleryDeleted = useCallback((idOrSlug?: string | null) => {
+    if (!idOrSlug) return false;
+    const clean = idOrSlug.trim().toLowerCase();
+    return deletedGalleryIds.some(d => d.trim().toLowerCase() === clean || isSameId(d, idOrSlug));
+  }, [deletedGalleryIds]);
+
+  const isImageDeleted = useCallback((imgId?: string | null) => {
+    if (!imgId) return false;
+    const clean = imgId.trim().toLowerCase();
+    return deletedImageIds.some(d => d.trim().toLowerCase() === clean || isSameId(d, imgId));
+  }, [deletedImageIds]);
+
+  // Cache loaded images so image counts never flicker to 0 during queries or reconnects
+  const [cachedImages, setCachedImages] = useState<GalleryImage[]>(() => loadImagesFromStorage());
+
+  useEffect(() => {
+    if (imagesDbData?.images && imagesDbData.images.length > 0) {
+      const remoteImgs = imagesDbData.images as unknown as GalleryImage[];
+      setCachedImages(prev => {
+        const map = new Map<string, GalleryImage>();
+        prev.forEach(img => map.set(img.id, img));
+        remoteImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+        const merged = Array.from(map.values());
+        saveImagesToStorage(merged);
+        return merged;
+      });
+    }
+  }, [imagesDbData?.images]);
+
   // Sync / Seed initial data to InstantDB on first mount & clean up saturated local caches
   useEffect(() => {
     // Proactively purge any oversized image caches from previous sessions
     cleanupStaleStorage();
+    // Proactively purge legacy demo users and demo galleries from InstantDB
+    purgeLegacyDemoDataFromDb().catch(err => console.error('Demo purge error:', err));
     // Proactively ensure defined admin users exist in InstantDB
     syncAdminUsersToDb().catch(err => console.error('Admin sync warning:', err));
   }, []);
@@ -128,120 +220,169 @@ export default function App() {
 
   // Robustly merge InstantDB data with local fallbacks and guarantee all predefined administrators exist
   const users: User[] = useMemo(() => {
-    const userMap = new Map<string, User>();
     const isDeleted = (idOrEmail: string) => {
       const clean = idOrEmail.toLowerCase();
       return deletedUserIds.some(d => d.toLowerCase() === clean);
     };
 
-    // 1. Initial staff/admin users baseline
-    INITIAL_USERS.forEach(u => {
-      if (u.role === 'admin' || !isDeleted(u.id) && !isDeleted(u.email)) {
-        userMap.set(u.email.toLowerCase(), u);
-      }
-    });
+    const legacyDemoEmails = [
+      'sofia.valenzuela@gmail.com',
+      'valeria@hautemode.es',
+      'comms@nexustech.io',
+      'isabella@fontanadesign.com',
+      'elena@somospixart.com',
+    ];
 
-    // 2. Merge local storage users (excluding deleted)
-    localUsers.forEach(u => {
-      if (!u.email) return;
-      if (isDeleted(u.id) || isDeleted(u.email)) return;
-      const email = u.email.toLowerCase();
-      const existing = userMap.get(email);
-      userMap.set(email, { ...(existing || {}), ...u });
-    });
+    const userMap = new Map<string, User>();
 
-    // 3. Merge InstantDB users (excluding deleted)
+    // 1. Always enforce the current administrative accounts
+    const admin1 = INITIAL_USERS.find(u => u.email === 'admin@somospixart.com');
+    if (admin1 && !isDeleted(admin1.id) && !isDeleted(admin1.email)) {
+      userMap.set('admin@somospixart.com', admin1);
+    }
+    const admin2 = INITIAL_USERS.find(u => u.email === 'victor@somospixart.com');
+    if (admin2 && !isDeleted(admin2.id) && !isDeleted(admin2.email)) {
+      userMap.set('victor@somospixart.com', admin2);
+    }
+
+    // 2. When InstantDB is connected, remote database is the SOLE source of truth for clients
     if (dbData?.users && dbData.users.length > 0) {
       (dbData.users as unknown as User[]).forEach(u => {
         if (!u.email) return;
-        if (isDeleted(u.id) || isDeleted(u.email)) return;
         const email = u.email.toLowerCase();
-        const base = userMap.get(email);
+        if (legacyDemoEmails.includes(email) || isDeleted(u.id) || isDeleted(u.email)) return;
 
-        const initialMatch = INITIAL_USERS.find(iu => iu.email.toLowerCase() === email);
-        const isCoreAdmin = initialMatch && initialMatch.role === 'admin';
+        const local = localUsers.find(l => l.email?.toLowerCase() === email || isSameId(l.id, u.id));
+        const initial = INITIAL_USERS.find(iu => iu.email.toLowerCase() === email || isSameId(iu.id, u.id));
+        const isCoreAdmin = email === 'admin@somospixart.com' || email === 'victor@somospixart.com';
 
         const merged: User = {
-          ...(base || {}),
+          ...(local || {}),
           ...u,
-          id: base?.id || u.id,
-          name: isCoreAdmin && initialMatch ? initialMatch.name : (u.name || base?.name || ''),
-          password: isCoreAdmin && initialMatch ? initialMatch.password : (u.password || base?.password || 'admin2026'),
-          role: isCoreAdmin && initialMatch ? 'admin' : (u.role || base?.role || 'client'),
-          assignedGalleryIds: Array.isArray(u.assignedGalleryIds) ? u.assignedGalleryIds : (base?.assignedGalleryIds || []),
+          id: u.id,
+          name: isCoreAdmin && initial ? initial.name : (u.name || local?.name || initial?.name || ''),
+          password: isCoreAdmin && initial ? initial.password : (u.password || local?.password || initial?.password || 'cliente2026'),
+          role: isCoreAdmin ? 'admin' : (u.role || local?.role || initial?.role || 'client'),
+          assignedGalleryIds: Array.isArray(u.assignedGalleryIds) && u.assignedGalleryIds.length > 0 
+            ? u.assignedGalleryIds 
+            : (local?.assignedGalleryIds || initial?.assignedGalleryIds || []),
+          avatar: u.avatar || local?.avatar || initial?.avatar || DEFAULT_PROFILE_AVATAR,
+          phone: u.phone || local?.phone || initial?.phone || '',
+          company: u.company || local?.company || initial?.company || '',
+          canDownloadHighRes: u.canDownloadHighRes ?? local?.canDownloadHighRes ?? true,
+          canLeaveFeedback: u.canLeaveFeedback ?? local?.canLeaveFeedback ?? true,
+          canSelectFavorites: u.canSelectFavorites ?? local?.canSelectFavorites ?? true,
         };
         userMap.set(email, merged);
       });
+    } else {
+      // 3. Fallback only when InstantDB is not yet connected or empty
+      INITIAL_USERS.forEach(u => {
+        if (!isDeleted(u.id) && !isDeleted(u.email) && !legacyDemoEmails.includes(u.email.toLowerCase())) {
+          userMap.set(u.email.toLowerCase(), u);
+        }
+      });
+      localUsers.forEach(u => {
+        if (!u.email) return;
+        const email = u.email.toLowerCase();
+        if (legacyDemoEmails.includes(email) || isDeleted(u.id) || isDeleted(u.email)) return;
+        const existing = userMap.get(email);
+        userMap.set(email, { ...(existing || {}), ...u });
+      });
     }
 
-    // Always enforce the current administrative accounts
-    const admin1 = INITIAL_USERS.find(u => u.email === 'admin@somospixart.com');
-    if (admin1) {
-      userMap.set('admin@somospixart.com', { ...(userMap.get('admin@somospixart.com') || {}), ...admin1 });
-    }
-    const admin2 = INITIAL_USERS.find(u => u.email === 'victor@somospixart.com');
-    if (admin2) {
-      userMap.set('victor@somospixart.com', { ...(userMap.get('victor@somospixart.com') || {}), ...admin2 });
-    }
-
-    // Filter out any user in deletedUserIds
-    return Array.from(userMap.values()).filter(u => !isDeleted(u.id) && !isDeleted(u.email));
+    // Filter out any user in deletedUserIds or legacy demo
+    return Array.from(userMap.values()).filter(u => 
+      !isDeleted(u.id) && 
+      !isDeleted(u.email) &&
+      !legacyDemoEmails.includes(u.email.toLowerCase())
+    );
   }, [dbData?.users, localUsers, deletedUserIds]);
 
   const galleries: GallerySession[] = useMemo(() => {
-    if (dbData?.galleries && dbData.galleries.length > 0) {
-      const mergedDbGals = (dbData.galleries as unknown as GallerySession[]).map(g => {
+    const rawGals: GallerySession[] = (dbData?.galleries && dbData.galleries.length > 0)
+      ? (dbData.galleries as unknown as GallerySession[])
+      : localGalleries;
+
+    const legacyDemoGalIds = ['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'];
+
+    const mergedDbGals = rawGals
+      .filter(g => 
+        !isGalleryDeleted(g.id) && 
+        !isGalleryDeleted(g.slug) && 
+        (!legacyDemoGalIds.includes((g.id || '').toLowerCase())) &&
+        (!legacyDemoGalIds.includes((g.slug || '').toLowerCase())) &&
+        (!(g as any).originalLocalId || !isGalleryDeleted((g as any).originalLocalId))
+      )
+      .map(g => {
         const local = localGalleries.find(l => isSameId(l.id, g.id) || (l.title && g.title && l.title.trim().toLowerCase() === g.title.trim().toLowerCase()));
         const initial = INITIAL_GALLERIES.find(ig => isSameId(ig.id, g.id));
+        const effectiveCount = (g.photoCount !== undefined && g.photoCount > 0)
+          ? g.photoCount
+          : (local?.photoCount && local.photoCount > 0 ? local.photoCount : (initial?.photoCount ?? 0));
+
         return {
           ...g,
           id: g.id,
-          title: local?.title || g.title,
-          slug: local?.slug || g.slug,
-          coverImage: local?.coverImage || g.coverImage || initial?.coverImage || '',
-          coverImagePosition: local?.coverImagePosition || g.coverImagePosition || initial?.coverImagePosition || 'center',
-          clientIds: Array.isArray(g.clientIds) && g.clientIds.length > 0 ? g.clientIds : (local?.clientIds || []),
-          clientNames: Array.isArray(g.clientNames) && g.clientNames.length > 0 ? g.clientNames : (local?.clientNames || []),
+          title: g.title || local?.title || initial?.title || '',
+          slug: g.slug || local?.slug || initial?.slug || '',
+          coverImage: g.coverImage || local?.coverImage || initial?.coverImage || '',
+          coverImagePosition: g.coverImagePosition || local?.coverImagePosition || initial?.coverImagePosition || 'center',
+          clientIds: Array.isArray(g.clientIds) && g.clientIds.length > 0 ? g.clientIds : (local?.clientIds || initial?.clientIds || []),
+          clientNames: Array.isArray(g.clientNames) && g.clientNames.length > 0 ? g.clientNames : (local?.clientNames || initial?.clientNames || []),
           feedbackList: Array.isArray(g.feedbackList) && g.feedbackList.length > 0 ? g.feedbackList : (local?.feedbackList || []),
+          photoCount: effectiveCount,
           originalLocalId: local?.id,
         };
       });
 
-      // Preserve any local galleries not yet reflected in dbData
-      const missingLocals = localGalleries.filter(local => 
-        !mergedDbGals.some(dg => isSameId(dg.id, local.id))
-      );
+    // In any browser, dbData.galleries is the sole source of truth once loaded.
+    // Only if dbData is still initial loading without any galleries do we fallback to INITIAL_GALLERIES / localGalleries.
+    const missingLocals = (!dbData?.galleries || dbData.galleries.length === 0)
+      ? localGalleries.filter(local => 
+          !isGalleryDeleted(local.id) &&
+          !isGalleryDeleted(local.slug) &&
+          !legacyDemoGalIds.includes((local.id || '').toLowerCase()) &&
+          !legacyDemoGalIds.includes((local.slug || '').toLowerCase()) &&
+          !mergedDbGals.some(dg => isSameId(dg.id, local.id))
+        )
+      : [];
 
-      return [...mergedDbGals, ...missingLocals];
-    }
-    return localGalleries;
-  }, [dbData?.galleries, localGalleries]);
+    return [...mergedDbGals, ...missingLocals];
+  }, [dbData?.galleries, localGalleries, isGalleryDeleted]);
 
   const images: GalleryImage[] = useMemo(() => {
-    if (dbData?.images && dbData.images.length > 0) {
-      const mergedDbImages = (dbData.images as unknown as GalleryImage[]).map(img => {
+    // Prefer remote images if present, otherwise use cachedImages (retaining previous query results if query is refreshing)
+    const baseList: GalleryImage[] = (imagesDbData?.images && imagesDbData.images.length > 0)
+      ? (imagesDbData.images as unknown as GalleryImage[])
+      : (cachedImages.length > 0 ? cachedImages : localImages);
+
+    const mergedDbImages = baseList
+      .filter(img => !isImageDeleted(img.id) && !isGalleryDeleted(img.galleryId))
+      .map(img => {
         const local = localImages.find(l => isSameId(l.id, img.id));
-        const initial = INITIAL_IMAGES.find(ii => isSameId(ii.id, img.id));
         return {
           ...img,
-          galleryId: local?.galleryId || img.galleryId,
-          url: local?.url || img.url || initial?.url || '',
-          highResUrl: local?.highResUrl || img.highResUrl || initial?.highResUrl || img.url || '',
-          imagePosition: local?.imagePosition || img.imagePosition || initial?.imagePosition || 'center',
+          galleryId: img.galleryId || local?.galleryId,
+          url: img.url || local?.url || '',
+          highResUrl: img.highResUrl || local?.highResUrl || img.url || '',
+          imagePosition: img.imagePosition || local?.imagePosition || 'center',
           favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : (local?.favoriteByUsers || []),
           tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
+          isFinalSelection: img.isFinalSelection ?? local?.isFinalSelection ?? false,
+          excludeWatermark: img.excludeWatermark ?? local?.excludeWatermark ?? false,
         };
       });
 
-      // Preserve any local images not yet reflected in dbData (e.g. freshly uploaded or cached photos)
-      const missingLocals = localImages.filter(local => 
-        !mergedDbImages.some(di => isSameId(di.id, local.id))
-      );
+    // Preserve local images not yet reflected in dbData, excluding any deleted images or images of deleted galleries
+    const missingLocals = localImages.filter(local => 
+      !isImageDeleted(local.id) &&
+      !isGalleryDeleted(local.galleryId) &&
+      !mergedDbImages.some(di => isSameId(di.id, local.id))
+    );
 
-      return [...mergedDbImages, ...missingLocals];
-    }
-    return localImages;
-  }, [dbData?.images, localImages]);
+    return [...mergedDbImages, ...missingLocals];
+  }, [imagesDbData?.images, cachedImages, localImages, isImageDeleted, isGalleryDeleted]);
 
   const logs: AuditLogItem[] = useMemo(() => {
     if (dbData?.logs && dbData.logs.length > 0) {
@@ -269,14 +410,35 @@ export default function App() {
   // Active notifications strictly filtered by existing galleries (prevents dead demo notifications from reappearing)
   const activeNotifications = useMemo(() => {
     return notifications.filter(n => {
-      if (!n.galleryId) return true;
-      return galleries.some(g => 
-        isSameId(g.id, n.galleryId) || 
-        (g.slug && isSameId(g.slug, n.galleryId)) ||
-        ((g as any).originalLocalId && isSameId((g as any).originalLocalId, n.galleryId))
-      );
+      // Discard notifications referencing blacklisted/deleted galleries
+      if (n.galleryId && isGalleryDeleted(n.galleryId)) return false;
+
+      // Discard notifications referencing old hardcoded demo galleries
+      const gidLower = (n.galleryId || '').toLowerCase();
+      if (['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'].includes(gidLower)) {
+        const demoExists = galleries.some(g => isSameId(g.id, n.galleryId));
+        if (!demoExists) return false;
+      }
+
+      // If notification has a galleryId, verify it exists in current active galleries
+      if (n.galleryId) {
+        return galleries.some(g => 
+          isSameId(g.id, n.galleryId) || 
+          (g.slug && isSameId(g.slug, n.galleryId)) ||
+          ((g as any).originalLocalId && isSameId((g as any).originalLocalId, n.galleryId))
+        );
+      }
+
+      // If notification has a galleryTitle, verify it exists in current active galleries
+      if (n.galleryTitle) {
+        return galleries.some(g => 
+          g.title && g.title.trim().toLowerCase() === n.galleryTitle?.trim().toLowerCase()
+        );
+      }
+
+      return true;
     });
-  }, [notifications, galleries]);
+  }, [notifications, galleries, isGalleryDeleted]);
 
   useEffect(() => {
     saveNotificationsToStorage(activeNotifications);
@@ -305,6 +467,7 @@ export default function App() {
 
   const handleClearNotifications = () => {
     setNotifications([]);
+    saveNotificationsToStorage([]);
   };
 
   const handleAddNotification = (notif: Omit<AppNotification, 'id' | 'timestamp' | 'readBy'>) => {
@@ -827,22 +990,53 @@ export default function App() {
   const handleDeleteGallery = (galleryId: string) => {
     const gal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
     const targetId = gal?.id || galleryId;
-    const relatedImgs = images.filter(img => img.galleryId === targetId || toUuid(img.galleryId) === toUuid(targetId)).map(i => i.id);
+    const targetSlug = gal?.slug;
+    const targetOriginalLocalId = (gal as any)?.originalLocalId;
+    const targetTitle = gal?.title;
 
-    setLocalGalleries(prev => prev.filter(g => g.id !== targetId && toUuid(g.id) !== toUuid(targetId)));
-    setLocalImages(prev => prev.filter(img => img.galleryId !== targetId && toUuid(img.galleryId) !== toUuid(targetId)));
+    const relatedImgs = images.filter(img => 
+      isSameId(img.galleryId, targetId) ||
+      (targetSlug && isSameId(img.galleryId, targetSlug)) ||
+      (targetOriginalLocalId && isSameId(img.galleryId, targetOriginalLocalId))
+    ).map(i => i.id);
 
+    // 1. Add to deleted IDs blacklists so they never resurrect from demo data or remote cache
+    setDeletedGalleryIds(prev => Array.from(new Set([
+      ...prev, 
+      targetId, 
+      ...(targetSlug ? [targetSlug] : []), 
+      ...(targetOriginalLocalId ? [targetOriginalLocalId] : [])
+    ])));
+    setDeletedImageIds(prev => Array.from(new Set([...prev, ...relatedImgs])));
+
+    // 2. Immediately update and persist local galleries
+    setLocalGalleries(prev => {
+      const next = prev.filter(g => !isSameId(g.id, targetId) && (!targetSlug || !isSameId(g.slug, targetSlug)));
+      saveGalleriesToStorage(next);
+      return next;
+    });
+
+    // 3. Immediately update and persist local images
+    setLocalImages(prev => {
+      const next = prev.filter(img => !isSameId(img.galleryId, targetId) && (!targetSlug || !isSameId(img.galleryId, targetSlug)));
+      saveImagesToStorage(next);
+      return next;
+    });
+
+    // 4. Immediately clean up and persist notifications
+    setNotifications(prev => {
+      const next = prev.filter(n => {
+        if (n.galleryId && (isSameId(n.galleryId, targetId) || (targetSlug && isSameId(n.galleryId, targetSlug)))) return false;
+        if (targetTitle && n.galleryTitle && n.galleryTitle.trim().toLowerCase() === targetTitle.trim().toLowerCase()) return false;
+        return true;
+      });
+      saveNotificationsToStorage(next);
+      return next;
+    });
+
+    // 5. Delete in InstantDB
     deleteGalleryInDb(targetId, relatedImgs).catch(err => console.error('InstantDB delete gallery error:', err));
-    addAuditLog('Sesión Eliminada', `Eliminó la sesión "${gal?.title}" y liberó su espacio en disco.`, gal?.title);
-
-    // Clean up notifications referencing this deleted gallery
-    setNotifications(prev => prev.filter(n => 
-      !n.galleryId || (
-        !isSameId(n.galleryId, targetId) && 
-        (!gal?.slug || !isSameId(n.galleryId, gal.slug)) &&
-        (!(gal as any)?.originalLocalId || !isSameId(n.galleryId, (gal as any).originalLocalId))
-      )
-    ));
+    addAuditLog('Sesión Eliminada', `Eliminó la sesión "${targetTitle || targetId}" y liberó su espacio en disco.`, targetTitle);
   };
 
   // CRUD Operations: Users/Clients
@@ -852,13 +1046,21 @@ export default function App() {
       id: id(),
       createdDate: new Date().toISOString().split('T')[0],
     };
-    setLocalUsers(prev => [...prev, newUser]);
+    setLocalUsers(prev => {
+      const next = [...prev, newUser];
+      saveUsersToStorage(next);
+      return next;
+    });
     createUserInDb(newUser).catch(err => console.error('InstantDB create user error:', err));
     addAuditLog('Cliente Registrado', `Registró al nuevo cliente ${newUser.name} (${newUser.email}).`);
   };
 
   const handleUpdateUser = (updatedUser: User) => {
-    setLocalUsers(prev => prev.map(u => (u.id === updatedUser.id || toUuid(u.id) === toUuid(updatedUser.id)) ? updatedUser : u));
+    setLocalUsers(prev => {
+      const next = prev.map(u => (u.id === updatedUser.id || toUuid(u.id) === toUuid(updatedUser.id)) ? updatedUser : u);
+      saveUsersToStorage(next);
+      return next;
+    });
     if (currentUser?.id === updatedUser.id || toUuid(currentUser?.id || '') === toUuid(updatedUser.id)) {
       setCurrentUser(updatedUser);
     }
@@ -873,7 +1075,11 @@ export default function App() {
 
     // Mark as deleted to prevent resurrection from demo data or remote cache
     setDeletedUserIds(prev => Array.from(new Set([...prev, targetId, userId, ...(targetEmail ? [targetEmail] : [])])));
-    setLocalUsers(prev => prev.filter(u => u.id !== targetId && toUuid(u.id) !== toUuid(targetId) && u.email?.toLowerCase() !== targetEmail));
+    setLocalUsers(prev => {
+      const next = prev.filter(u => u.id !== targetId && toUuid(u.id) !== toUuid(targetId) && u.email?.toLowerCase() !== targetEmail);
+      saveUsersToStorage(next);
+      return next;
+    });
     deleteUserInDb(targetId).catch(err => console.error('InstantDB delete user error:', err));
     addAuditLog('Cliente Eliminado', `Eliminó el acceso del cliente ${targetUser?.name || 'Cliente'}.`);
   };
@@ -887,7 +1093,11 @@ export default function App() {
       createdDate: new Date().toISOString().split('T')[0],
     };
 
-    setLocalUsers(prev => [...prev, newUser]);
+    setLocalUsers(prev => {
+      const next = [...prev, newUser];
+      saveUsersToStorage(next);
+      return next;
+    });
     createUserInDb(newUser).catch(err => console.error('InstantDB create user error:', err));
     setCurrentUser(newUser);
 
@@ -917,6 +1127,8 @@ export default function App() {
       iso?: number;
       shutterSpeed?: string;
       aperture?: string;
+      isFinalSelection?: boolean;
+      excludeWatermark?: boolean;
     }
   ) => {
     const parentGal = galleries.find(g => g.id === galleryId || toUuid(g.id) === toUuid(galleryId));
@@ -936,10 +1148,26 @@ export default function App() {
       favoriteByUsers: [],
       uploadedAt: new Date().toLocaleString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
       optimized: false,
+      isFinalSelection: !!imageFile.isFinalSelection,
+      excludeWatermark: !!imageFile.excludeWatermark,
     };
 
-    setLocalImages(prev => [newImage, ...prev]);
+    setLocalImages(prev => {
+      const next = [newImage, ...prev];
+      saveImagesToStorage(next);
+      return next;
+    });
     uploadImageToDb(newImage).catch(err => console.error('InstantDB upload image error:', err));
+
+    // Update gallery cover and photo count
+    if (parentGal) {
+      const currentCount = parentGal.photoCount || 0;
+      handleUpdateGallery({
+        ...parentGal,
+        photoCount: currentCount + 1,
+        coverImage: (!parentGal.coverImage || parentGal.coverImage.trim() === '') ? newImage.url : parentGal.coverImage,
+      });
+    }
 
     addAuditLog('Carga de Fotografía', `Subió la foto "${newImage.title}" (${(newImage.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB) [${newImage.cameraModel}] a la galería.`, parentGal?.title);
 
@@ -962,9 +1190,29 @@ export default function App() {
   const handleDeleteImage = (imageId: string) => {
     const targetImg = images.find(i => i.id === imageId || toUuid(i.id) === toUuid(imageId));
     const targetId = targetImg?.id || imageId;
-    setLocalImages(prev => prev.filter(img => img.id !== targetId && toUuid(img.id) !== toUuid(targetId)));
+    
+    // Blacklist image ID so it cannot resurrect
+    setDeletedImageIds(prev => Array.from(new Set([...prev, targetId, imageId])));
+    
+    setLocalImages(prev => {
+      const next = prev.filter(img => img.id !== targetId && toUuid(img.id) !== toUuid(targetId));
+      saveImagesToStorage(next);
+      return next;
+    });
     deleteImageFromDb(targetId).catch(err => console.error('InstantDB delete image error:', err));
-    addAuditLog('Foto Eliminada', `Eliminó la imagen "${targetImg?.title}" y liberó espacio en el servidor.`);
+
+    // Decrement photoCount in parent gallery
+    if (targetImg?.galleryId) {
+      const parentGal = galleries.find(g => isSameId(g.id, targetImg.galleryId));
+      if (parentGal && (parentGal.photoCount || 0) > 0) {
+        handleUpdateGallery({
+          ...parentGal,
+          photoCount: Math.max(0, (parentGal.photoCount || 1) - 1),
+        });
+      }
+    }
+
+    addAuditLog('Foto Eliminada', `Eliminó la imagen "${targetImg?.title || 'Foto'}" y liberó espacio en el servidor.`);
   };
 
   const handleDeleteAllImagesInGallery = (galleryId: string) => {
@@ -974,8 +1222,24 @@ export default function App() {
     if (!targetImages.length) return;
 
     const imageIds = targetImages.map(img => img.id);
-    setLocalImages(prev => prev.filter(img => img.galleryId !== targetGalId && toUuid(img.galleryId) !== toUuid(targetGalId)));
+    
+    // Blacklist all image IDs in this gallery
+    setDeletedImageIds(prev => Array.from(new Set([...prev, ...imageIds])));
+    
+    setLocalImages(prev => {
+      const next = prev.filter(img => img.galleryId !== targetGalId && toUuid(img.galleryId) !== toUuid(targetGalId));
+      saveImagesToStorage(next);
+      return next;
+    });
     deleteImagesBatchFromDb(imageIds).catch(err => console.error('InstantDB batch delete error:', err));
+
+    if (parentGal) {
+      handleUpdateGallery({
+        ...parentGal,
+        photoCount: 0,
+      });
+    }
+
     addAuditLog('Fotos Eliminadas Masivamente', `Eliminó todas las fotografías (${targetImages.length} fotos) de la sesión "${parentGal?.title || 'Galería'}".`);
   };
 

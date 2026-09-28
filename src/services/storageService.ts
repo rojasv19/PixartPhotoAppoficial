@@ -108,7 +108,13 @@ export function calculateServerStats(
   customQuotaBytes?: number
 ): ServerStorageStats {
   const totalCapacity = customQuotaBytes && customQuotaBytes > 0 ? customQuotaBytes : loadServerQuotaFromStorage();
-  const totalUsedBytes = images.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
+  const rawUsedBytes = images.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
+  const totalGalleryPhotos = galleries.reduce((acc, g) => acc + (g.photoCount || 0), 0);
+  const effectiveTotalImages = images.length > 0 ? images.length : totalGalleryPhotos;
+
+  // If heavy photo payloads are currently being fetched, reflect storage based on photoCount (~3.2MB per photo)
+  const totalUsedBytes = rawUsedBytes > 0 ? rawUsedBytes : effectiveTotalImages * 3200000;
+
   const optimizedImages = images.filter(img => img.optimized);
   const unoptimizedImages = images.filter(img => !img.optimized);
 
@@ -121,7 +127,7 @@ export function calculateServerStats(
     totalCapacityBytes: totalCapacity,
     usedBytes: totalUsedBytes,
     galleriesCount: galleries.length,
-    totalImagesCount: images.length,
+    totalImagesCount: effectiveTotalImages,
     optimizedImagesCount: optimizedImages.length,
     potentialSavingsBytes: Math.round(potentialSavingsBytes),
   };
@@ -400,13 +406,26 @@ export function loadUsersFromStorage(): User[] {
       const parsed: User[] = JSON.parse(data);
       const userMap = new Map<string, User>();
       
-      // Start with initial users (ensures Victor Rojas and Maurely Carmona are present)
-      INITIAL_USERS.forEach(u => userMap.set(u.email.toLowerCase(), u));
+      const legacyDemoEmails = [
+        'sofia.valenzuela@gmail.com',
+        'valeria@hautemode.es',
+        'comms@nexustech.io',
+        'isabella@fontanadesign.com',
+        'elena@somospixart.com',
+      ];
 
-      // Merge saved users
+      // Start with initial users (ensures Victor Rojas, Maurely Carmona, José Luis Nava, Roberto Zanetti)
+      INITIAL_USERS.forEach(u => {
+        if (!legacyDemoEmails.includes(u.email.toLowerCase())) {
+          userMap.set(u.email.toLowerCase(), u);
+        }
+      });
+
+      // Merge saved users (excluding legacy demo users)
       parsed.forEach(u => {
         if (!u.email) return;
         const email = u.email.toLowerCase();
+        if (legacyDemoEmails.includes(email)) return;
         const existing = userMap.get(email);
         userMap.set(email, { ...(existing || {}), ...u });
       });
@@ -434,7 +453,18 @@ export function saveUsersToStorage(users: User[]) {
 export function loadGalleriesFromStorage(): GallerySession[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.GALLERIES);
-    if (data) return JSON.parse(data);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const legacyDemoGalIds = ['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'];
+        const cleaned = parsed.filter(g => 
+          g && 
+          !legacyDemoGalIds.includes((g.id || '').toLowerCase()) &&
+          !legacyDemoGalIds.includes((g.slug || '').toLowerCase())
+        );
+        if (cleaned.length > 0) return cleaned;
+      }
+    }
   } catch (e) {
     console.error(e);
   }
@@ -462,11 +492,17 @@ export function loadImagesFromStorage(): GalleryImage[] {
 
 export function saveImagesToStorage(images: GalleryImage[]) {
   try {
-    // Sanitize image array to prevent clogging localStorage:
-    // If photos have large base64 data URLs (> 50KB), omit the heavy URL in localStorage cache
-    // since InstantDB and React memory state retain the full high-resolution image data.
+    // Try saving directly if payload is reasonable
+    const directPayload = JSON.stringify(images);
+    if (directPayload.length < 2500000) {
+      if (safeSetItem(STORAGE_KEYS.IMAGES, directPayload)) {
+        return;
+      }
+    }
+
+    // If payload is larger than 2.5MB or safeSetItem hit a quota, sanitize heavy data URLs (> 200KB)
     const sanitizedImages = images.map(img => {
-      if (img.url && img.url.startsWith('data:') && img.url.length > 50000) {
+      if (img.url && img.url.startsWith('data:') && img.url.length > 200000) {
         return {
           ...img,
           url: '',
@@ -509,7 +545,20 @@ export function saveLogsToStorage(logs: AuditLogItem[]) {
 export function loadNotificationsFromStorage(): AppNotification[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-    if (data) return JSON.parse(data);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        // Discard any phantom demo notifications or orphan entries
+        return parsed.filter(n => {
+          if (!n || typeof n !== 'object') return false;
+          const gid = (n.galleryId || '').toLowerCase();
+          if (['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'].includes(gid)) {
+            return false;
+          }
+          return true;
+        });
+      }
+    }
   } catch (e) {
     console.error(e);
   }
@@ -552,6 +601,56 @@ export function cleanupStaleStorage() {
       // Images cache is larger than 500KB; purge it so it doesn't starve quota
       localStorage.removeItem(STORAGE_KEYS.IMAGES);
       console.log('[SafeStorage] Proactively purged heavy image cache from localStorage to keep app fast and stable.');
+    }
+    // Clean up phantom demo notifications
+    const notifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    if (notifs) {
+      try {
+        const parsed = JSON.parse(notifs);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(n => {
+            const gid = (n.galleryId || '').toLowerCase();
+            return !['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'].includes(gid);
+          });
+          localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(cleaned));
+        }
+      } catch {}
+    }
+
+    // Clean up legacy demo galleries from localStorage
+    const storedGals = localStorage.getItem(STORAGE_KEYS.GALLERIES);
+    if (storedGals) {
+      try {
+        const parsed = JSON.parse(storedGals);
+        if (Array.isArray(parsed)) {
+          const legacyDemoGalIds = ['gal-wedding-1', 'gal-editorial-2', 'gal-portrait-3', 'gal-corp-4'];
+          const cleaned = parsed.filter(g => 
+            g && 
+            !legacyDemoGalIds.includes((g.id || '').toLowerCase()) && 
+            !legacyDemoGalIds.includes((g.slug || '').toLowerCase())
+          );
+          localStorage.setItem(STORAGE_KEYS.GALLERIES, JSON.stringify(cleaned));
+        }
+      } catch {}
+    }
+
+    // Clean up legacy demo users from localStorage
+    const storedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          const legacyDemoEmails = [
+            'sofia.valenzuela@gmail.com',
+            'valeria@hautemode.es',
+            'comms@nexustech.io',
+            'isabella@fontanadesign.com',
+            'elena@somospixart.com',
+          ];
+          const cleaned = parsed.filter(u => u && !legacyDemoEmails.includes((u.email || '').toLowerCase()));
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleaned));
+        }
+      } catch {}
     }
   } catch (e) {
     console.warn('[SafeStorage] Cleanup check notice:', e);

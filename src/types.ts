@@ -116,6 +116,7 @@ export interface GallerySession {
   titleTypography?: TypographyStyle;
   subtitleTypography?: TypographyStyle;
   descriptionTypography?: TypographyStyle;
+  photoCount?: number;
 }
 
 export interface AuditLogItem {
