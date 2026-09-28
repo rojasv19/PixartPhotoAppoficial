@@ -232,7 +232,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
-        const targetGallery = galleries.find(g => g.id === galleryId);
+        const targetGallery = galleries.find(g => isSameId(g.id, galleryId));
         if (targetGallery) {
           onUpdateGallery({
             ...targetGallery,
@@ -249,7 +249,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       onUpdateGalleryCoverPosition(galleryId, position);
       return;
     }
-    const targetGallery = galleries.find(g => g.id === galleryId);
+    const targetGallery = galleries.find(g => isSameId(g.id, galleryId));
     if (targetGallery) {
       onUpdateGallery({
         ...targetGallery,
@@ -297,8 +297,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const filteredInspectorImages = useMemo(() => {
     if (photoFilterGalleryId === 'all') return images;
-    return images.filter(i => isSameId(i.galleryId, photoFilterGalleryId));
-  }, [images, photoFilterGalleryId]);
+    const targetGal = galleries.find(g => isSameId(g.id, photoFilterGalleryId));
+    return images.filter(i => 
+      isSameId(i.galleryId, photoFilterGalleryId) ||
+      (targetGal?.slug && isSameId(i.galleryId, targetGal.slug)) ||
+      ((targetGal as any)?.originalLocalId && isSameId(i.galleryId, (targetGal as any).originalLocalId)) ||
+      (targetGal?.title && i.galleryId?.trim().toLowerCase() === targetGal.title.trim().toLowerCase())
+    );
+  }, [images, photoFilterGalleryId, galleries]);
 
   // Storage Stats Summary
   const usedPercentage = Math.min(100, (storageStats.usedBytes / storageStats.totalCapacityBytes) * 100);
@@ -1395,7 +1401,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     isDark ? 'divide-stone-800/60' : 'divide-slate-200'
                   }`}>
                     {galleries.map((gal) => {
-                      const galImages = images.filter(i => isSameId(i.galleryId, gal.id));
+                      const galImages = images.filter(i => 
+                        isSameId(i.galleryId, gal.id) || 
+                        (gal.slug && isSameId(i.galleryId, gal.slug)) || 
+                        ((gal as any).originalLocalId && isSameId(i.galleryId, (gal as any).originalLocalId)) ||
+                        (gal.title && i.galleryId?.trim().toLowerCase() === gal.title.trim().toLowerCase())
+                      );
                       const sizeBytes = galImages.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
 
                       return (
@@ -1937,7 +1948,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     >
                       <option value="all">Todas las sesiones ({images.length} fotos)</option>
                       {galleries.map(g => {
-                        const count = images.filter(i => isSameId(i.galleryId, g.id)).length;
+                        const count = images.filter(i => 
+                          isSameId(i.galleryId, g.id) || 
+                          (g.slug && isSameId(i.galleryId, g.slug)) || 
+                          ((g as any).originalLocalId && isSameId(i.galleryId, (g as any).originalLocalId)) ||
+                          (g.title && i.galleryId?.trim().toLowerCase() === g.title.trim().toLowerCase())
+                        ).length;
                         return (
                           <option key={g.id} value={g.id}>
                             {g.title} ({count} fotos)
@@ -3943,7 +3959,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* Details */}
             {(() => {
-              const galImgs = images.filter(i => isSameId(i.galleryId, galleryToEmptyPhotos.id));
+              const galImgs = images.filter(i => 
+                isSameId(i.galleryId, galleryToEmptyPhotos.id) || 
+                (galleryToEmptyPhotos.slug && isSameId(i.galleryId, galleryToEmptyPhotos.slug)) || 
+                ((galleryToEmptyPhotos as any).originalLocalId && isSameId(i.galleryId, (galleryToEmptyPhotos as any).originalLocalId)) ||
+                (galleryToEmptyPhotos.title && i.galleryId?.trim().toLowerCase() === galleryToEmptyPhotos.title.trim().toLowerCase())
+              );
               const totalBytes = galImgs.reduce((acc, i) => acc + (i.fileSizeBytes || 0), 0);
               return (
                 <div className={`p-4 rounded-2xl border space-y-2 text-xs ${

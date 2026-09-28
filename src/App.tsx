@@ -191,15 +191,19 @@ export default function App() {
   const galleries: GallerySession[] = useMemo(() => {
     if (dbData?.galleries && dbData.galleries.length > 0) {
       const mergedDbGals = (dbData.galleries as unknown as GallerySession[]).map(g => {
-        const local = localGalleries.find(l => isSameId(l.id, g.id));
+        const local = localGalleries.find(l => isSameId(l.id, g.id) || (l.title && g.title && l.title.trim().toLowerCase() === g.title.trim().toLowerCase()));
         const initial = INITIAL_GALLERIES.find(ig => isSameId(ig.id, g.id));
         return {
           ...g,
-          coverImage: g.coverImage || local?.coverImage || initial?.coverImage || '',
-          coverImagePosition: g.coverImagePosition || local?.coverImagePosition || initial?.coverImagePosition || 'center',
-          clientIds: Array.isArray(g.clientIds) ? g.clientIds : (local?.clientIds || []),
-          clientNames: Array.isArray(g.clientNames) ? g.clientNames : (local?.clientNames || []),
-          feedbackList: Array.isArray(g.feedbackList) ? g.feedbackList : (local?.feedbackList || []),
+          id: g.id,
+          title: local?.title || g.title,
+          slug: local?.slug || g.slug,
+          coverImage: local?.coverImage || g.coverImage || initial?.coverImage || '',
+          coverImagePosition: local?.coverImagePosition || g.coverImagePosition || initial?.coverImagePosition || 'center',
+          clientIds: Array.isArray(g.clientIds) && g.clientIds.length > 0 ? g.clientIds : (local?.clientIds || []),
+          clientNames: Array.isArray(g.clientNames) && g.clientNames.length > 0 ? g.clientNames : (local?.clientNames || []),
+          feedbackList: Array.isArray(g.feedbackList) && g.feedbackList.length > 0 ? g.feedbackList : (local?.feedbackList || []),
+          originalLocalId: local?.id,
         };
       });
 
@@ -220,9 +224,10 @@ export default function App() {
         const initial = INITIAL_IMAGES.find(ii => isSameId(ii.id, img.id));
         return {
           ...img,
-          url: img.url || local?.url || initial?.url || '',
-          highResUrl: img.highResUrl || local?.highResUrl || initial?.highResUrl || img.url || '',
-          imagePosition: img.imagePosition || local?.imagePosition || initial?.imagePosition || 'center',
+          galleryId: local?.galleryId || img.galleryId,
+          url: local?.url || img.url || initial?.url || '',
+          highResUrl: local?.highResUrl || img.highResUrl || initial?.highResUrl || img.url || '',
+          imagePosition: local?.imagePosition || img.imagePosition || initial?.imagePosition || 'center',
           favoriteByUsers: Array.isArray(img.favoriteByUsers) ? img.favoriteByUsers : (local?.favoriteByUsers || []),
           tags: Array.isArray(img.tags) ? img.tags : (local?.tags || []),
         };
@@ -261,9 +266,21 @@ export default function App() {
   // App Notifications System
   const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotificationsFromStorage());
 
+  // Active notifications strictly filtered by existing galleries (prevents dead demo notifications from reappearing)
+  const activeNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (!n.galleryId) return true;
+      return galleries.some(g => 
+        isSameId(g.id, n.galleryId) || 
+        (g.slug && isSameId(g.slug, n.galleryId)) ||
+        ((g as any).originalLocalId && isSameId((g as any).originalLocalId, n.galleryId))
+      );
+    });
+  }, [notifications, galleries]);
+
   useEffect(() => {
-    saveNotificationsToStorage(notifications);
-  }, [notifications]);
+    saveNotificationsToStorage(activeNotifications);
+  }, [activeNotifications]);
 
   const handleMarkNotificationAsRead = (notificationId: string) => {
     const userId = currentUser?.id || 'guest';
@@ -817,6 +834,15 @@ export default function App() {
 
     deleteGalleryInDb(targetId, relatedImgs).catch(err => console.error('InstantDB delete gallery error:', err));
     addAuditLog('Sesión Eliminada', `Eliminó la sesión "${gal?.title}" y liberó su espacio en disco.`, gal?.title);
+
+    // Clean up notifications referencing this deleted gallery
+    setNotifications(prev => prev.filter(n => 
+      !n.galleryId || (
+        !isSameId(n.galleryId, targetId) && 
+        (!gal?.slug || !isSameId(n.galleryId, gal.slug)) &&
+        (!(gal as any)?.originalLocalId || !isSameId(n.galleryId, (gal as any).originalLocalId))
+      )
+    ));
   };
 
   // CRUD Operations: Users/Clients
@@ -999,7 +1025,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         branding={branding}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
-        notifications={notifications}
+        notifications={activeNotifications}
         onMarkNotificationAsRead={handleMarkNotificationAsRead}
         onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
         onClearNotifications={handleClearNotifications}

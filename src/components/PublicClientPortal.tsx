@@ -51,8 +51,8 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
   const clientGalleries = currentUser
     ? galleries.filter(g => 
         currentUser.role === 'admin' || 
-        currentUser.assignedGalleryIds?.includes(g.id) || 
-        g.clientIds?.includes(currentUser.id)
+        (currentUser.assignedGalleryIds || []).some(gid => isSameId(gid, g.id) || (g.slug && isSameId(gid, g.slug))) || 
+        (g.clientIds || []).some(cid => isSameId(cid, currentUser.id))
       )
     : galleries.filter(g => g.status === 'published');
 
@@ -273,7 +273,12 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
         {/* Galleries Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGalleries.map(gallery => {
-            const galleryImages = images.filter(img => isSameId(img.galleryId, gallery.id));
+            const galleryImages = images.filter(img => 
+              isSameId(img.galleryId, gallery.id) || 
+              (gallery.slug && isSameId(img.galleryId, gallery.slug)) || 
+              ((gallery as any).originalLocalId && isSameId(img.galleryId, (gallery as any).originalLocalId)) ||
+              (gallery.title && img.galleryId?.trim().toLowerCase() === gallery.title.trim().toLowerCase())
+            );
 
             return (
               <div

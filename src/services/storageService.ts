@@ -86,8 +86,13 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-export function calculateGallerySize(galleryId: string, images: GalleryImage[]): { totalBytes: number; optimizedBytes: number; imageCount: number } {
-  const galleryImages = images.filter(img => isSameId(img.galleryId, galleryId));
+export function calculateGallerySize(galleryId: string, images: GalleryImage[], gallery?: GallerySession): { totalBytes: number; optimizedBytes: number; imageCount: number } {
+  const galleryImages = images.filter(img => 
+    isSameId(img.galleryId, galleryId) ||
+    (gallery?.slug && isSameId(img.galleryId, gallery.slug)) ||
+    ((gallery as any)?.originalLocalId && isSameId(img.galleryId, (gallery as any).originalLocalId)) ||
+    (gallery?.title && img.galleryId?.trim().toLowerCase() === gallery.title.trim().toLowerCase())
+  );
   const totalBytes = galleryImages.reduce((acc, img) => acc + (img.fileSizeBytes || 0), 0);
   const optimizedBytes = galleryImages.reduce((acc, img) => acc + (img.optimized ? (img.compressedSizeBytes || img.fileSizeBytes * 0.18) : img.fileSizeBytes), 0);
   return {

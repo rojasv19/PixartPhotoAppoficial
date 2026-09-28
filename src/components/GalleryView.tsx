@@ -124,8 +124,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
   // Gallery specific images
   const galleryImages = useMemo(() => {
-    return images.filter(img => isSameId(img.galleryId, gallery.id));
-  }, [images, gallery.id]);
+    return images.filter(img => 
+      isSameId(img.galleryId, gallery.id) || 
+      (gallery.slug && isSameId(img.galleryId, gallery.slug)) ||
+      ((gallery as any).originalLocalId && isSameId(img.galleryId, (gallery as any).originalLocalId)) ||
+      (gallery.title && img.galleryId?.trim().toLowerCase() === gallery.title.trim().toLowerCase())
+    );
+  }, [images, gallery.id, gallery.slug, (gallery as any).originalLocalId, gallery.title]);
 
   const effectiveUserId = useMemo(() => {
     return currentUser?.id || gallery.clientIds?.[0] || 'usr-guest';
