@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para corregir el botón de favoritos en el Lightbox, incorporar pestañas de 'Imágenes sin edición' y 'Selección Final' en el modal de subida de fotos, habilitar la pestaña 'Selección Final' en la barra de navegación del cliente con descargas en máxima resolución por defecto, y mostrar la pestaña de Selección Final en el perfil del cliente.",
-  "updatedAt":  "2026-09-28T00:52:45.089547091Z",
+  "summary":  "Plan para integrar una barra de búsqueda en tiempo real dentro de la barra de navegación de la galería (junto a las pestañas 'Todas', 'Favoritas' y 'Selección Final'), con soporte de filtrado multicriterio por título, nombre de archivo, número de imagen y etiquetas.",
+  "updatedAt":  "2026-09-28T15:41:42.678119884Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Heart, Download, MessageSquare, Share2, MapPin, 
   Calendar, Camera, Check, Filter, Grid, LayoutGrid, Sparkles, 
   Star, Send, HardDrive, ShieldAlert, CheckCircle2, ChevronDown, 
-  Info, Eye, Layers, Lock, Upload, X, ImageIcon, Maximize2, Trash2, AlertTriangle
+  Info, Eye, Layers, Lock, Upload, X, ImageIcon, Maximize2, Trash2, AlertTriangle, Search
 } from 'lucide-react';
 import { GallerySession, GalleryImage, User, FeedbackItem, StudioBrandingConfig } from '../types';
 import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../services/storageService';
@@ -57,6 +57,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'favorites' | string>('all');
   const [gridColumns, setGridColumns] = useState<'masonry' | 'standard' | 'large'>('masonry');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Feedback Form State
   const [feedbackRating, setFeedbackRating] = useState<number>(5);
@@ -177,13 +178,63 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return Array.from(tagsSet);
   }, [galleryImages]);
 
-  // Filtered Images
+  // Helper to normalize strings (remove accents and lowercase)
+  const normalizeText = (text?: string | null): string => {
+    if (!text) return '';
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  };
+
+  // Filtered Images with Category Tabs and Multi-Criteria Search
   const displayedImages = useMemo(() => {
-    if (filterMode === 'all') return galleryImages;
-    if (filterMode === 'favorites') return clientFavorites;
-    if (filterMode === 'final_selection') return finalSelectionImages;
-    return galleryImages.filter(img => img.tags?.includes(filterMode));
-  }, [galleryImages, clientFavorites, finalSelectionImages, filterMode]);
+    let baseList = galleryImages;
+    if (filterMode === 'favorites') baseList = clientFavorites;
+    else if (filterMode === 'final_selection') baseList = finalSelectionImages;
+    else if (filterMode !== 'all') baseList = galleryImages.filter(img => img.tags?.includes(filterMode));
+
+    const cleanQuery = normalizeText(searchQuery);
+    if (!cleanQuery) return baseList;
+
+    // Digits for numerical match (e.g., #12, foto 12, 12, or numbers inside originalFileName)
+    const digitsOnly = cleanQuery.replace(/[^0-9]/g, '');
+
+    return baseList.filter(img => {
+      // 1. Title match
+      const titleNorm = normalizeText(img.title);
+      if (titleNorm.includes(cleanQuery)) return true;
+
+      // 2. Original file name match (e.g., IMG_0042.RAW, foto-boda.jpg)
+      const fileNorm = normalizeText(img.originalFileName);
+      if (fileNorm.includes(cleanQuery)) return true;
+
+      // 3. Tags match
+      if (img.tags?.some(tag => normalizeText(tag).includes(cleanQuery))) return true;
+
+      // 4. Number / sequence index match
+      // a) Position index in the complete gallery (1-based: "foto 1", "#1", "1")
+      const originalIdx = galleryImages.findIndex(i => isSameId(i.id, img.id)) + 1;
+      if (originalIdx > 0) {
+        if (`${originalIdx}` === cleanQuery || `#${originalIdx}` === cleanQuery || `foto ${originalIdx}` === cleanQuery) {
+          return true;
+        }
+        if (digitsOnly && Number(digitsOnly) === originalIdx) {
+          return true;
+        }
+      }
+
+      // b) Any numeric sequence embedded in originalFileName or title (e.g. DSC_0042 -> "42" or "0042")
+      if (digitsOnly && digitsOnly.length > 0) {
+        if (fileNorm.includes(digitsOnly) || titleNorm.includes(digitsOnly)) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }, [galleryImages, clientFavorites, finalSelectionImages, filterMode, searchQuery]);
 
   // Total Storage Size of this gallery
   const totalGalleryBytes = useMemo(() => {
@@ -629,7 +680,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             </button>
 
             {/* Tag filters */}
-            {allTags.slice(0, 5).map(tag => (
+            {allTags.slice(0, 4).map(tag => (
               <button
                 key={tag}
                 id={`filter-tag-${tag.toLowerCase()}-btn`}
@@ -643,6 +694,50 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                 #{tag}
               </button>
             ))}
+
+            {/* Integrated Search Bar */}
+            <div className="relative flex-1 min-w-[200px] max-w-xs sm:max-w-sm">
+              <div className="relative flex items-center">
+                <Search className={`w-3.5 h-3.5 absolute left-3 pointer-events-none transition-colors ${
+                  searchQuery ? colorTheme.twText : isDark ? 'text-slate-500' : 'text-slate-400'
+                }`} />
+                <input
+                  id="gallery-search-input"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por título, archivo, # o tag..."
+                  className={`w-full pl-8.5 pr-8 py-1.5 rounded-xl text-xs transition-all border outline-hidden ${
+                    isDark 
+                      ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500 focus:border-slate-600 focus:bg-slate-850' 
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-slate-300 focus:bg-white'
+                  } ${searchQuery ? (isDark ? 'border-slate-700 bg-slate-850 ring-1 ring-slate-700' : 'border-slate-300 bg-white ring-1 ring-slate-300') : ''}`}
+                />
+                {searchQuery && (
+                  <button
+                    id="clear-gallery-search-btn"
+                    onClick={() => setSearchQuery('')}
+                    className={`absolute right-2.5 p-0.5 rounded-full transition-colors cursor-pointer ${
+                      isDark ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Active search results counter pill */}
+            {searchQuery && (
+              <span className={`text-[11px] font-mono-code font-semibold px-2 py-0.5 rounded-lg border ${
+                displayedImages.length > 0 
+                  ? (isDark ? 'bg-slate-900 text-emerald-400 border-slate-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                  : (isDark ? 'bg-slate-900 text-amber-400 border-slate-800' : 'bg-amber-50 text-amber-700 border-amber-200')
+              }`}>
+                {displayedImages.length} {displayedImages.length === 1 ? 'resultado' : 'resultados'}
+              </span>
+            )}
           </div>
 
           {/* Grid Density View Switcher & Dedicated Batch Download */}
@@ -716,7 +811,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
               isDark ? 'bg-slate-850 text-slate-500' : 'bg-slate-100 text-slate-400'
             }`}>
-              {filterMode === 'final_selection' ? (
+              {searchQuery ? (
+                <Search className="w-8 h-8 text-amber-400" />
+              ) : filterMode === 'final_selection' ? (
                 <Sparkles className="w-8 h-8 text-emerald-400" />
               ) : filterMode === 'favorites' ? (
                 <Heart className="w-8 h-8 text-rose-500" />
@@ -725,21 +822,33 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               )}
             </div>
             <h3 className={`text-lg font-bold font-serif-display ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {filterMode === 'final_selection'
+              {searchQuery
+                ? `No se encontraron fotos para "${searchQuery}"`
+                : filterMode === 'final_selection'
                 ? 'Aún no hay fotos en Selección Final'
                 : filterMode === 'favorites' 
                 ? 'Aún no has marcado fotos favoritas' 
                 : 'No hay fotografías en esta categoría'}
             </h3>
             <p className={`text-xs max-w-md mx-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {filterMode === 'final_selection'
+              {searchQuery
+                ? 'Prueba buscando por otro término, nombre de archivo, número de imagen o limpia la búsqueda para ver todas las fotos.'
+                : filterMode === 'final_selection'
                 ? 'El fotógrafo subirá aquí las imágenes editadas y definitivas autorizadas para su descarga en máxima resolución.'
                 : filterMode === 'favorites' 
                 ? 'Haz clic en el icono de corazón en cualquier foto para guardarla en tu selección personal para el álbum o retoques.'
                 : 'Cambia el filtro a "Todas" para explorar el catálogo completo de la sesión.'
               }
             </p>
-            {(filterMode === 'favorites' || filterMode === 'final_selection') && (
+            {searchQuery ? (
+              <button
+                id="clear-search-results-btn"
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md shadow-blue-600/20 cursor-pointer"
+              >
+                Limpiar Búsqueda
+              </button>
+            ) : (filterMode === 'favorites' || filterMode === 'final_selection') && (
               <button
                 id="reset-filter-to-all-btn"
                 onClick={() => setFilterMode('all')}
