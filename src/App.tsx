@@ -47,6 +47,8 @@ import {
   toggleImageFavoriteInDb,
   updateImageInDb,
   updateImagePositionInDb,
+  updateImageFavoritesInDb,
+  updateImageRetouchAndTagsInDb,
   batchUpdateImagePositionsInDb,
   updateGalleryCoverPositionInDb,
   restoreDefaultImagesAndGalleriesInDb,
@@ -591,18 +593,43 @@ export default function App() {
     }
   };
 
-  // Update Image metadata / retouch notes
+  // Update Image metadata / retouch notes / favorites
   const handleUpdateImage = (updatedImage: GalleryImage) => {
     if (!updatedImage || !updatedImage.id) return;
+    const existing = images.find(img => isSameId(img.id, updatedImage.id));
+
     setLocalImages(prev => {
       const next = prev.map(img => isSameId(img.id, updatedImage.id) ? updatedImage : img);
       saveImagesToStorage(next);
       return next;
     });
+
+    // Check if favoriteByUsers was updated
+    const prevFavs = existing?.favoriteByUsers || [];
+    const nextFavs = updatedImage.favoriteByUsers || [];
+    const favsChanged = prevFavs.length !== nextFavs.length || prevFavs.some((f, idx) => f !== nextFavs[idx]);
+
+    if (favsChanged) {
+      updateImageFavoritesInDb(updatedImage.id, nextFavs).catch(err => console.error('Error updating favorites in DB:', err));
+    }
+
+    // Check if tags or client note was updated
+    const prevTags = existing?.tags || [];
+    const nextTags = updatedImage.tags || [];
+    const tagsChanged = prevTags.length !== nextTags.length || prevTags.some((t, idx) => t !== nextTags[idx]);
+    const noteChanged = (existing?.clientNote || '') !== (updatedImage.clientNote || '');
+
+    if (tagsChanged || noteChanged) {
+      updateImageRetouchAndTagsInDb(updatedImage.id, nextTags, updatedImage.clientNote || '').catch(err => console.error('Error updating tags in DB:', err));
+    }
+
     // Use granular position update so the photo's url/highResUrl are never touched
-    updateImagePositionInDb(updatedImage.id, updatedImage.imagePosition || 'center')
-      .catch(() => updateImageInDb(updatedImage).catch(err => console.error('Error updating image in DB:', err)));
-    addAuditLog('Foto Actualizada', `Se actualizó el encuadre para "${updatedImage.title}".`);
+    if (existing?.imagePosition !== updatedImage.imagePosition) {
+      updateImagePositionInDb(updatedImage.id, updatedImage.imagePosition || 'center')
+        .catch(() => updateImageInDb(updatedImage).catch(err => console.error('Error updating image in DB:', err)));
+    }
+
+    addAuditLog('Foto Actualizada', `Se actualizó la información para "${updatedImage.title}".`);
   };
 
   // Batch update image framing / position for all images in a gallery

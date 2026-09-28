@@ -8,6 +8,7 @@ import {
 import { GallerySession, GalleryImage, User, StudioBrandingConfig, RetouchStatus } from '../types';
 import { formatBytes, downloadSingleImage, downloadImagesAsZip } from '../services/storageService';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
+import { isSameId } from '../services/instantDbService';
 import { WatermarkOverlay } from './WatermarkOverlay';
 
 interface AdminFavoritesViewProps {
@@ -42,6 +43,9 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
   const [zipProgress, setZipProgress] = useState<number>(0);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
 
+  // Instant local removal tracking so removing/clearing is immediate in UI
+  const [removedImageIds, setRemovedImageIds] = useState<Set<string>>(new Set());
+
   // Modals & Feedback Toasts
   const [showBatchCompleteModal, setShowBatchCompleteModal] = useState<boolean>(false);
   const [showClearCompletedModal, setShowClearCompletedModal] = useState<boolean>(false);
@@ -61,12 +65,61 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
     }> = [];
 
     images.forEach(img => {
+      // Skip if explicitly removed in this session
+      if (removedImageIds.has(img.id)) return;
+
       const favUserIds = img.favoriteByUsers || [];
       if (favUserIds.length > 0) {
-        const parentGallery = galleries.find(g => g.id === img.galleryId);
+        const parentGallery = galleries.find(g => isSameId(g.id, img.galleryId));
+        
+        // 1. Direct match with registered users via isSameId (handles UUID & raw ID)
         const favoritedClients = users.filter(u => 
-          favUserIds.includes(u.id) || favUserIds.some(fId => fId.toLowerCase() === u.id.toLowerCase())
+          favUserIds.some(fId => isSameId(u.id, fId))
         );
+
+        // 2. Fallback to parent gallery's client information if direct user id not matched
+        let resolvedClients = [...favoritedClients];
+        
+        if (resolvedClients.length === 0 && parentGallery) {
+          // Check if parent gallery has assigned clientIds matching existing users
+          if (parentGallery.clientIds && parentGallery.clientIds.length > 0) {
+            const galClients = users.filter(u => 
+              parentGallery.clientIds?.some(cId => isSameId(u.id, cId))
+            );
+            if (galClients.length > 0) {
+              resolvedClients = galClients;
+            }
+          }
+
+          // If still no user, use parentGallery.clientNames
+          if (resolvedClients.length === 0 && parentGallery.clientNames && parentGallery.clientNames.length > 0) {
+            resolvedClients = parentGallery.clientNames.map((name, idx) => ({
+              id: `client-session-${parentGallery.id}-${idx}`,
+              name,
+              email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@cliente.com`,
+              role: 'client' as const,
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+              status: 'active' as const,
+              createdDate: parentGallery.createdAt || '2024-01-01',
+              assignedGalleryIds: [parentGallery.id],
+            }));
+          }
+
+          // If still no name, derive real title from the gallery (e.g. "Sofía & Mateo")
+          if (resolvedClients.length === 0 && parentGallery.title) {
+            const cleanTitleName = parentGallery.title.split('—')[0]?.split('-')[0]?.trim() || parentGallery.title;
+            resolvedClients = [{
+              id: `client-session-${parentGallery.id}`,
+              name: cleanTitleName,
+              email: 'cliente@galeria.com',
+              role: 'client' as const,
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+              status: 'active' as const,
+              createdDate: parentGallery.createdAt || '2024-01-01',
+              assignedGalleryIds: [parentGallery.id],
+            }];
+          }
+        }
 
         // Retouch status
         const override = retouchOverrides[img.id];
@@ -76,18 +129,7 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
         list.push({
           image: img,
           gallery: parentGallery,
-          clients: favoritedClients.length > 0 ? favoritedClients : [
-            {
-              id: 'usr-client-generic',
-              name: 'Cliente Asignado',
-              email: 'cliente@galeria.com',
-              role: 'client',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-              status: 'active',
-              createdDate: '2024-01-01',
-              assignedGalleryIds: [img.galleryId],
-            }
-          ],
+          clients: resolvedClients,
           retouchStatus: status,
           retouchNotes: notes,
         });
@@ -95,7 +137,7 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
     });
 
     return list;
-  }, [images, galleries, users, retouchOverrides]);
+  }, [images, galleries, users, retouchOverrides, removedImageIds]);
 
   // Clients that have selected at least 1 favorite
   const clientsWithFavorites = useMemo(() => {
@@ -210,8 +252,16 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
 
   // Remove single image from favorites
   const handleRemoveSingleFavorite = (imageId: string) => {
-    const target = images.find(img => img.id === imageId);
+    const target = images.find(img => img.id === imageId || isSameId(img.id, imageId));
     if (!target) return;
+
+    // Immediately hide from view in UI
+    setRemovedImageIds(prev => {
+      const next = new Set(prev);
+      next.add(target.id);
+      next.add(imageId);
+      return next;
+    });
 
     if (onUpdateImage) {
       onUpdateImage({
@@ -244,7 +294,7 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
         notes: entry.retouchNotes || '',
       };
       if (onUpdateImage) {
-        const target = images.find(img => img.id === entry.image.id);
+        const target = images.find(img => img.id === entry.image.id || isSameId(img.id, entry.image.id));
         if (target) {
           const cleanTags = (target.tags || []).filter(
             t => t !== 'editado' && t !== 'en_edicion' && t !== 'pendiente'
@@ -278,9 +328,16 @@ export const AdminFavoritesView: React.FC<AdminFavoritesViewProps> = ({
       return;
     }
 
+    // Immediately hide all completed from UI
+    setRemovedImageIds(prev => {
+      const next = new Set(prev);
+      completedEntries.forEach(e => next.add(e.image.id));
+      return next;
+    });
+
     completedEntries.forEach(entry => {
       if (onUpdateImage) {
-        const target = images.find(img => img.id === entry.image.id);
+        const target = images.find(img => img.id === entry.image.id || isSameId(img.id, entry.image.id));
         if (target) {
           onUpdateImage({
             ...target,

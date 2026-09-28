@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de corrección para el error de cuota de localStorage ('somos_pixart_users_v5' y 'somos_pixart_branding_v3'). Incluye blindaje de todas las llamadas a setItem con try/catch, depuración automática de caché pesada de imágenes en base64, sincronización prioritaria con InstantDB en la nube y herramientas de recuperación de memoria en el panel del estudio.",
-  "updatedAt":  "2026-09-27T23:23:00.558768765Z",
+  "summary":  "Plan de implementación para corregir la eliminación de favoritas y la resolución de nombres de clientes en el panel de administración, reubicar la barra de búsqueda hacia el encabezado de sesiones y expandir la sección Hero a 100vw y 100vh en el portal de clientes.",
+  "updatedAt":  "2026-09-27T23:51:17.264738951Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

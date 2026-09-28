@@ -91,8 +91,8 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
       isDark ? 'bg-[#0F1012] text-slate-100' : 'bg-[#F8F9FA] text-slate-800'
     } pb-24`}>
       
-      {/* Hero Section: 80% screen height, clean, uncluttered, no access cards */}
-      <div className={`relative overflow-hidden border-b transition-colors -mt-16 min-h-[80vh] flex flex-col justify-center items-center ${
+      {/* Hero Section: 100% viewport width and 100% viewport height */}
+      <div className={`relative overflow-hidden border-b transition-colors -mt-16 w-screen max-w-full h-screen min-h-screen flex flex-col justify-center items-center ${
         isDark ? 'border-slate-800 bg-[#0c0d0e] text-white' : 'border-slate-200 bg-slate-900 text-white'
       }`}>
         
@@ -196,29 +196,14 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
             </p>
           )}
 
-          {/* Clean Quick Search input */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md mx-auto">
-            <div className="relative w-full">
-              <input
-                id="portal-hero-search-input"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar sesión, locación o evento..."
-                className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/40 shadow-lg"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-            </div>
-          </div>
-
         </div>
       </div>
 
       {/* Featured / Client Galleries Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-8">
         
-        {/* Header & Filter Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-slate-200 dark:border-slate-800">
+        {/* Header & Filter Controls with Search */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b pb-4 border-slate-200 dark:border-slate-800">
           <div>
             <h2 className="text-2xl font-bold font-serif-display">
               {currentUser?.role === 'client' ? 'Tus Galerías Privadas Asignadas' : 'Galerías de Sesiones Fotográficas'}
@@ -228,8 +213,37 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
             </p>
           </div>
 
-          {/* Categories Pill Selector */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          {/* Search bar & Categories in galleries menu bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Search Input right in the Galleries menu bar */}
+            <div className="relative w-full sm:w-64">
+              <input
+                id="portal-galleries-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar sesión, evento o locación..."
+                className={`w-full text-xs rounded-xl pl-9 pr-7 py-2.5 border transition-all focus:outline-none focus:ring-2 ${
+                  isDark
+                    ? 'bg-stone-900/90 border-slate-800 text-white placeholder:text-slate-500 focus:ring-blue-500/40'
+                    : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500/40 shadow-xs'
+                }`}
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200 text-xs cursor-pointer p-0.5"
+                  title="Limpiar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Categories Pill Selector */}
+            <div className="flex flex-wrap items-center gap-1.5">
             {[
               { id: 'all', label: 'Todas' },
               { id: 'boda', label: 'Bodas' },
@@ -253,6 +267,7 @@ export const PublicClientPortal: React.FC<PublicClientPortalProps> = ({
             ))}
           </div>
         </div>
+      </div>
 
         {/* Galleries Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

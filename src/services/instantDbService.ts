@@ -517,6 +517,26 @@ export async function toggleImageFavoriteInDb(
   ]);
 }
 
+export async function updateImageFavoritesInDb(imageId: string, favoriteByUsers: string[]) {
+  const imageUuid = toUuid(imageId);
+  const favUuids = (favoriteByUsers || []).map(uid => toUuid(uid));
+  return db.transact([
+    tx.images[imageUuid].update({
+      favoriteByUsers: favUuids,
+    })
+  ]);
+}
+
+export async function updateImageRetouchAndTagsInDb(imageId: string, tags?: string[], clientNote?: string) {
+  const imageUuid = toUuid(imageId);
+  const patch: Record<string, any> = {};
+  if (tags !== undefined) patch.tags = tags;
+  if (clientNote !== undefined) patch.clientNote = clientNote;
+  return db.transact([
+    tx.images[imageUuid].update(patch)
+  ]);
+}
+
 export async function addFeedbackToDb(
   galleryId: string,
   newFeedback: FeedbackItem,
