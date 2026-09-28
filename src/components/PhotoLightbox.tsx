@@ -112,9 +112,9 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
 
   if (!image) return null;
 
-  const currentIndex = images.findIndex(img => img.id === image.id);
+  const currentIndex = images.findIndex(img => isSameId(img.id, image.id));
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < images.length - 1;
+  const hasNext = currentIndex >= 0 && currentIndex < images.length - 1;
 
   const handlePrev = () => {
     if (hasPrev) onSelectImage(images[currentIndex - 1]);
@@ -125,13 +125,39 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   };
 
   const effectiveUserId = currentUser?.id || gallery?.clientIds?.[0] || 'usr-guest';
-  const isFavorite = (image.favoriteByUsers || []).some(favId => isSameId(favId, effectiveUserId));
+  const activeImage = images.find(img => isSameId(img.id, image.id)) || image;
+
+  // Real-time favorite evaluation
+  const isServerFav = (activeImage.favoriteByUsers || []).some(favId => isSameId(favId, effectiveUserId));
+  const [optimisticFav, setOptimisticFav] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setOptimisticFav(null);
+  }, [activeImage.id, activeImage.favoriteByUsers, effectiveUserId]);
+
+  const isFavorite = optimisticFav !== null ? optimisticFav : isServerFav;
+
+  const handleToggleFavClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const nextState = !isFavorite;
+    setOptimisticFav(nextState);
+    onToggleFavorite(activeImage.id);
+  };
+
+  const isFinalSelection = !!activeImage.isFinalSelection || (activeImage.tags || []).some(t => {
+    const lower = t.toLowerCase();
+    return lower === 'selección final' || lower === 'seleccion final' || lower === 'seleccion_final';
+  });
+
+  const allowDownloadHere = isFinalSelection || activeImage.excludeWatermark || (!gallery?.watermarkEnabled && canDownload) || (currentUser?.role === 'admin') || canDownload;
 
   const handleDownload = async (type: 'high-res' | 'web-res') => {
     setDownloadingType(type);
-    await downloadSingleImage(image, type, {
-      watermarkEnabled: gallery?.watermarkEnabled,
-      excludeWatermark: image.excludeWatermark,
+    const skipWatermark = isFinalSelection || activeImage.excludeWatermark;
+    await downloadSingleImage(activeImage, type, {
+      watermarkEnabled: skipWatermark ? false : gallery?.watermarkEnabled,
+      excludeWatermark: skipWatermark,
       watermarkType: gallery?.watermarkType,
       watermarkText: gallery?.watermarkText,
       watermarkImageUrl: gallery?.watermarkImageUrl,
@@ -225,35 +251,39 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             </span>
           </button>
 
-          {/* Favorite Button */}
+          {/* Favorite Button with immediate visual feedback */}
           {canFavorite && (
             <button
               id="lightbox-fav-btn"
-              onClick={() => onToggleFavorite(image.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              type="button"
+              onClick={handleToggleFavClick}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer select-none ${
                 isFavorite
-                  ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/20'
-                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-rose-500/50 hover:text-rose-300'
+                  ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/40 ring-1 ring-rose-400 scale-105'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-rose-500/50 hover:text-rose-300 hover:bg-slate-850'
               }`}
+              title={isFavorite ? "Quitar de favoritas" : "Marcar como favorita"}
             >
-              <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-              <span className="hidden sm:inline">{isFavorite ? 'En Favoritos' : 'Favorita'}</span>
+              <Heart className={`w-4 h-4 transition-transform ${isFavorite ? 'fill-current text-white scale-110' : 'text-slate-400'}`} />
+              <span className="hidden sm:inline font-bold">{isFavorite ? 'En Favoritos' : 'Favorita'}</span>
             </button>
           )}
 
-          {/* Download Button: Automatically enabled if photo is exempt from watermark OR if gallery allows download */}
-          {((image.excludeWatermark) || (!gallery?.watermarkEnabled && canDownload) || (currentUser?.role === 'admin')) && (
+          {/* Download Button: Enabled for Final Selection in high-res by default, or if exempt from watermark, or if gallery allows */}
+          {allowDownloadHere && (
             <div className="relative group">
               <button
                 id="lightbox-download-highres-btn"
                 onClick={() => handleDownload('high-res')}
                 disabled={downloadingType !== null}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50 cursor-pointer ${
-                  image.excludeWatermark 
+                  isFinalSelection
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/30'
+                    : activeImage.excludeWatermark 
                     ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30' 
                     : `${colorTheme.twBg} ${colorTheme.twBgHover} ${colorTheme.twShadow}`
                 }`}
-                title={image.excludeWatermark ? "Foto sin marca de agua: Descarga autorizada" : "Descargar archivo RAW en alta resolución"}
+                title={isFinalSelection ? "Descargar Selección Final en Máxima Resolución (Sin Marcas)" : activeImage.excludeWatermark ? "Foto sin marca de agua: Descarga autorizada" : "Descargar archivo en alta resolución"}
               >
                 {downloadSuccess ? (
                   <>
@@ -264,7 +294,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                   <>
                     <Download className="w-4 h-4" />
                     <span className="hidden sm:inline">
-                      {image.excludeWatermark ? 'Descargar RAW (Sin Marca)' : 'Descargar RAW'}
+                      {isFinalSelection ? 'Descargar Máxima Resolución' : activeImage.excludeWatermark ? 'Descargar (Sin Marca)' : 'Descargar RAW'}
                     </span>
                     <span className="sm:hidden">Descargar</span>
                   </>
@@ -365,11 +395,11 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               } object-contain rounded-lg shadow-2xl border border-slate-800 block`}
             />
 
-            {/* Watermark Overlay in Lightbox */}
-            {gallery?.watermarkEnabled && (
+            {/* Watermark Overlay in Lightbox (omitted for Final Selection delivered photos) */}
+            {gallery?.watermarkEnabled && !isFinalSelection && (
               <WatermarkOverlay
                 watermarkEnabled={gallery.watermarkEnabled}
-                excludeWatermark={image.excludeWatermark}
+                excludeWatermark={activeImage.excludeWatermark}
                 watermarkType={gallery.watermarkType}
                 watermarkText={gallery.watermarkText}
                 watermarkImageUrl={gallery.watermarkImageUrl}

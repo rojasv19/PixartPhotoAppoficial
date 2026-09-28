@@ -42,6 +42,8 @@ interface AdminDashboardProps {
     width: number; 
     height: number; 
     tags: string[];
+    isFinalSelection?: boolean;
+    excludeWatermark?: boolean;
     cameraModel?: string;
     lens?: string;
     focalLength?: string;
@@ -276,10 +278,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadTab, setUploadTab] = useState<'raw' | 'final'>('raw');
   const [uploadSuccessNotification, setUploadSuccessNotification] = useState<{
     show: boolean;
     count: number;
     galleryTitle: string;
+    isFinal?: boolean;
   } | null>(null);
 
   // Client Deletion Confirmation Modal State
@@ -655,6 +659,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const items = [...pendingUploadFiles];
     const targetGallery = galleries.find(g => g.id === targetGalId);
     const galleryTitle = targetGallery?.title || 'Galería';
+    const isFinal = uploadTab === 'final';
+    const defaultTags = isFinal 
+      ? ['Selección Final', 'Alta Resolución', 'Editado'] 
+      : ['RAW', 'Sin Edición'];
 
     let currentItem = 0;
     const totalItems = items.length;
@@ -676,7 +684,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               fileSizeBytes: item.fileSizeBytes,
               width: item.width,
               height: item.height,
-              tags: ['RAW', 'Alta Resolución'],
+              tags: defaultTags,
+              isFinalSelection: isFinal,
+              excludeWatermark: isFinal,
               cameraModel: item.cameraModel,
               lens: item.lens,
               focalLength: item.focalLength,
@@ -695,6 +705,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           show: true,
           count: totalItems,
           galleryTitle,
+          isFinal,
         });
 
         // Keep success message visible for user to see
@@ -3327,6 +3338,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
+            {/* Upload Modal Tabs: "Imágenes sin edición" vs "Selección Final" */}
+            <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-stone-950/70 border border-stone-800">
+              <button
+                type="button"
+                id="upload-tab-raw-btn"
+                onClick={() => setUploadTab('raw')}
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  uploadTab === 'raw'
+                    ? `${colorTheme.twBg} text-white shadow-md shadow-blue-600/20`
+                    : isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Imágenes sin edición</span>
+              </button>
+
+              <button
+                type="button"
+                id="upload-tab-final-btn"
+                onClick={() => setUploadTab('final')}
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  uploadTab === 'final'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30'
+                    : isDark ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-emerald-300" />
+                <span>Selección Final</span>
+              </button>
+            </div>
+
+            {/* Helper Banner for active upload tab */}
+            <div className={`p-3 rounded-xl text-xs flex items-center gap-2.5 border ${
+              uploadTab === 'final'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : isDark ? 'bg-stone-900/80 border-stone-800 text-stone-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              {uploadTab === 'final' ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    <strong>Selección Final:</strong> Las fotografías subidas aquí se mostrarán directamente en la pestaña <em>Selección Final</em> de la galería y en el perfil del cliente, con descarga autorizada en máxima resolución por defecto.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span>
+                    <strong>Imágenes sin edición:</strong> Fotografías en bruto para revisión general, filtrado y preselección de favoritas por parte del cliente.
+                  </span>
+                </>
+              )}
+            </div>
+
             <form onSubmit={handleUploadImageSubmit} className="space-y-5">
               
               {/* File upload drag-and-drop area */}
@@ -3512,7 +3577,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       )}
                       <span className="font-semibold">
                         {uploadSuccessNotification 
-                          ? `¡Imágenes subidas correctamente! Se han agregado ${uploadSuccessNotification.count} fotografías a "${uploadSuccessNotification.galleryTitle}".`
+                          ? uploadSuccessNotification.isFinal
+                            ? `¡Selección Final subida con éxito! Se han agregado ${uploadSuccessNotification.count} fotografías definitivas a "${uploadSuccessNotification.galleryTitle}".`
+                            : `¡Imágenes subidas correctamente! Se han agregado ${uploadSuccessNotification.count} fotografías a "${uploadSuccessNotification.galleryTitle}".`
                           : `Subiendo fotografías al servidor...`
                         }
                       </span>
@@ -3534,7 +3601,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   {uploadSuccessNotification && (
                     <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-emerald-500/20 text-emerald-300">
-                      <span>Las fotografías ya están disponibles para los clientes y administradores.</span>
+                      <span>
+                        {uploadSuccessNotification.isFinal
+                          ? 'Las fotografías están listas para su descarga en máxima resolución en el perfil del cliente.'
+                          : 'Las fotografías ya están disponibles para los clientes y administradores.'
+                        }
+                      </span>
                       <button
                         type="button"
                         onClick={() => {

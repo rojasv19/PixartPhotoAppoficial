@@ -410,6 +410,7 @@ export async function uploadImageToDb(image: GalleryImage) {
       optimized: image.optimized,
       clientNote: image.clientNote || '',
       excludeWatermark: !!image.excludeWatermark,
+      isFinalSelection: !!image.isFinalSelection,
       imagePosition: image.imagePosition || 'center',
     })
   ]);
@@ -444,6 +445,7 @@ export async function updateImageInDb(image: GalleryImage) {
       optimized: image.optimized,
       clientNote: image.clientNote || '',
       excludeWatermark: !!image.excludeWatermark,
+      isFinalSelection: !!image.isFinalSelection,
       imagePosition: image.imagePosition || 'center',
     })
   ]);

@@ -62,6 +62,7 @@ export interface GalleryImage {
   optimized: boolean;
   clientNote?: string;
   excludeWatermark?: boolean; // If true, watermark is removed from this photo and direct download is enabled
+  isFinalSelection?: boolean; // If true, definitive edited photo for final client delivery
   imagePosition?: string; // 9-point framing e.g. 'center', 'center-top', 'center-bottom', 'left-top', etc.
 }
 

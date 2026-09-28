@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   ArrowLeft, Heart, Download, MessageSquare, Share2, MapPin, 
@@ -91,6 +91,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
   const [isDeletingBatch, setIsDeletingBatch] = useState<boolean>(false);
 
+  // Keep selectedImage in sync with live images collection
+  useEffect(() => {
+    if (selectedImage) {
+      const live = images.find(i => isSameId(i.id, selectedImage.id));
+      if (live && live !== selectedImage) {
+        setSelectedImage(live);
+      }
+    }
+  }, [images]);
+
   const handleConfirmDeleteSingle = () => {
     if (!photoToDelete || !onDeleteImage) return;
     onDeleteImage(photoToDelete.id);
@@ -128,10 +138,35 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     );
   }, [galleryImages, effectiveUserId]);
 
-  // Unique tags for filter
+  // Final Selection Images (Delivered high-res definitive selection)
+  const finalSelectionImages = useMemo(() => {
+    return galleryImages.filter(img => 
+      img.isFinalSelection || 
+      (img.tags || []).some(t => {
+        const lower = t.toLowerCase();
+        return lower === 'selección final' || lower === 'seleccion final' || lower === 'seleccion_final';
+      })
+    );
+  }, [galleryImages]);
+
+  // Unique tags for filter (excluding internal category tags)
   const allTags = useMemo(() => {
     const tagsSet = new Set<string>();
-    galleryImages.forEach(img => img.tags?.forEach(t => tagsSet.add(t)));
+    galleryImages.forEach(img => {
+      img.tags?.forEach(t => {
+        const lower = t.toLowerCase();
+        if (
+          lower !== 'selección final' && 
+          lower !== 'seleccion final' && 
+          lower !== 'seleccion_final' && 
+          lower !== 'raw' && 
+          lower !== 'alta resolución' && 
+          lower !== 'alta resolucion'
+        ) {
+          tagsSet.add(t);
+        }
+      });
+    });
     return Array.from(tagsSet);
   }, [galleryImages]);
 
@@ -139,8 +174,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   const displayedImages = useMemo(() => {
     if (filterMode === 'all') return galleryImages;
     if (filterMode === 'favorites') return clientFavorites;
+    if (filterMode === 'final_selection') return finalSelectionImages;
     return galleryImages.filter(img => img.tags?.includes(filterMode));
-  }, [galleryImages, clientFavorites, filterMode]);
+  }, [galleryImages, clientFavorites, finalSelectionImages, filterMode]);
 
   // Total Storage Size of this gallery
   const totalGalleryBytes = useMemo(() => {
@@ -192,18 +228,23 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
   };
 
   // Trigger batch ZIP download
-  const handleStartBatchDownload = async (onlyFavorites = false) => {
-    const targetImages = onlyFavorites ? clientFavorites : galleryImages;
+  const handleStartBatchDownload = async (onlyFavorites = false, onlyFinalSelection = false) => {
+    const targetImages = onlyFinalSelection 
+      ? finalSelectionImages 
+      : onlyFavorites 
+      ? clientFavorites 
+      : galleryImages;
     if (targetImages.length === 0) return;
 
     setIsBatchModalOpen(true);
     setBatchProgress(0);
     setBatchIsDone(false);
-    setBatchCurrentFile('Iniciando empaquetado seguro...');
+    setBatchCurrentFile(onlyFinalSelection ? 'Empaquetando Selección Final en máxima resolución...' : 'Iniciando empaquetado seguro...');
 
+    const zipSuffix = onlyFinalSelection ? 'Seleccion_Final_MaxRes' : onlyFavorites ? 'Favoritas' : 'Completa';
     await downloadImagesAsZip(
       targetImages,
-      `${gallery.title}_${onlyFavorites ? 'Favoritas' : 'Completa'}`,
+      `${gallery.title}_${zipSuffix}`,
       (percent, fileName) => {
         setBatchProgress(percent);
         setBatchCurrentFile(fileName);
@@ -566,6 +607,20 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
               <span>Favoritas ({clientFavorites.length})</span>
             </button>
 
+            {/* NEW: Selección Final Filter Button (Max-Resolution Definitive Client Delivery) */}
+            <button
+              id="filter-final-selection-btn"
+              onClick={() => setFilterMode('final_selection')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                filterMode === 'final_selection'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold shadow-md shadow-emerald-600/20'
+                  : isDark ? 'bg-slate-850 text-emerald-400 hover:bg-slate-800' : 'bg-slate-100 text-emerald-700 hover:bg-slate-200'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${filterMode === 'final_selection' ? 'fill-current' : ''}`} />
+              <span>Selección Final ({finalSelectionImages.length})</span>
+            </button>
+
             {/* Tag filters */}
             {allTags.slice(0, 5).map(tag => (
               <button
@@ -583,8 +638,20 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             ))}
           </div>
 
-          {/* Grid Density View Switcher */}
+          {/* Grid Density View Switcher & Dedicated Batch Download */}
           <div className="flex items-center gap-2 self-end sm:self-auto">
+            {filterMode === 'final_selection' && finalSelectionImages.length > 0 && (
+              <button
+                id="download-final-selection-zip-btn"
+                onClick={() => handleStartBatchDownload(false, true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                title="Descargar todas las fotos de la Selección Final en máxima resolución y sin marcas"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Descargar {finalSelectionImages.length} Finales (ZIP)</span>
+              </button>
+            )}
+
             {filterMode === 'favorites' && clientFavorites.length > 0 && canDownload && (
               <button
                 id="download-favorites-zip-btn"
@@ -642,18 +709,30 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
               isDark ? 'bg-slate-850 text-slate-500' : 'bg-slate-100 text-slate-400'
             }`}>
-              <Heart className="w-8 h-8" />
+              {filterMode === 'final_selection' ? (
+                <Sparkles className="w-8 h-8 text-emerald-400" />
+              ) : filterMode === 'favorites' ? (
+                <Heart className="w-8 h-8 text-rose-500" />
+              ) : (
+                <ImageIcon className="w-8 h-8" />
+              )}
             </div>
             <h3 className={`text-lg font-bold font-serif-display ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {filterMode === 'favorites' ? 'Aún no has marcado fotos favoritas' : 'No hay fotografías en esta categoría'}
+              {filterMode === 'final_selection'
+                ? 'Aún no hay fotos en Selección Final'
+                : filterMode === 'favorites' 
+                ? 'Aún no has marcado fotos favoritas' 
+                : 'No hay fotografías en esta categoría'}
             </h3>
             <p className={`text-xs max-w-md mx-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {filterMode === 'favorites' 
+              {filterMode === 'final_selection'
+                ? 'El fotógrafo subirá aquí las imágenes editadas y definitivas autorizadas para su descarga en máxima resolución.'
+                : filterMode === 'favorites' 
                 ? 'Haz clic en el icono de corazón en cualquier foto para guardarla en tu selección personal para el álbum o retoques.'
                 : 'Cambia el filtro a "Todas" para explorar el catálogo completo de la sesión.'
               }
             </p>
-            {filterMode === 'favorites' && (
+            {(filterMode === 'favorites' || filterMode === 'final_selection') && (
               <button
                 id="reset-filter-to-all-btn"
                 onClick={() => setFilterMode('all')}
@@ -699,10 +778,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     }}
                   />
 
-                  {/* Watermark Protection Overlay */}
+                  {/* Watermark Protection Overlay (omitted for final selection) */}
                   <WatermarkOverlay
-                    watermarkEnabled={gallery.watermarkEnabled}
-                    excludeWatermark={image.excludeWatermark}
+                    watermarkEnabled={(image.isFinalSelection || (image.tags || []).includes('Selección Final')) ? false : gallery.watermarkEnabled}
+                    excludeWatermark={(image.isFinalSelection || (image.tags || []).includes('Selección Final')) ? true : image.excludeWatermark}
                     watermarkType={gallery.watermarkType}
                     watermarkText={gallery.watermarkText}
                     watermarkImageUrl={gallery.watermarkImageUrl}
@@ -721,8 +800,14 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Top Badges: File Size & High-res indicator */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 z-20">
+                  {/* Top Badges: File Size, High-res & Final Selection indicator */}
+                  <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-20">
+                    {(image.isFinalSelection || (image.tags || []).some(t => t.toLowerCase() === 'selección final' || t.toLowerCase() === 'seleccion final')) && (
+                      <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-md text-[10px] font-bold text-white border border-emerald-400/40 flex items-center gap-1 shadow-sm">
+                        <Sparkles className="w-3 h-3" />
+                        <span>Selección Final</span>
+                      </span>
+                    )}
                     <span className="px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[10px] font-mono-code text-blue-300 border border-blue-500/30">
                       {formatBytes(image.fileSizeBytes)}
                     </span>
@@ -808,15 +893,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                       </button>
                     )}
 
-                    {/* Direct Download Icon: Shown automatically if photo is exempt from watermark OR if gallery allows download */}
-                    {(image.excludeWatermark || (!gallery.watermarkEnabled && canDownloadGeneral) || (currentUser?.role === 'admin')) && (
+                    {/* Direct Download Icon: Shown automatically if photo is exempt from watermark OR Selección Final OR if gallery allows download */}
+                    {(image.isFinalSelection || (image.tags || []).includes('Selección Final') || image.excludeWatermark || (!gallery.watermarkEnabled && canDownloadGeneral) || (currentUser?.role === 'admin') || canDownload) && (
                       <button
                         id={`direct-download-img-${image.id}`}
                         onClick={(e) => {
                           e.stopPropagation();
+                          const isFinal = image.isFinalSelection || (image.tags || []).some(t => t.toLowerCase() === 'selección final' || t.toLowerCase() === 'seleccion final');
                           downloadSingleImage(image, 'high-res', {
-                            watermarkEnabled: gallery.watermarkEnabled,
-                            excludeWatermark: image.excludeWatermark,
+                            watermarkEnabled: isFinal ? false : gallery.watermarkEnabled,
+                            excludeWatermark: isFinal ? true : image.excludeWatermark,
                             watermarkType: gallery.watermarkType,
                             watermarkText: gallery.watermarkText,
                             watermarkImageUrl: gallery.watermarkImageUrl,
@@ -825,11 +911,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                           });
                         }}
                         className={`p-2 rounded-xl border transition-colors flex-shrink-0 cursor-pointer ${
-                          image.excludeWatermark
+                          (image.isFinalSelection || (image.tags || []).includes('Selección Final'))
+                            ? 'bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/30 hover:to-teal-600/30 text-emerald-300 border-emerald-500/40 shadow-xs'
+                            : image.excludeWatermark
                             ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40'
                             : isDark ? 'bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-blue-400 border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-blue-600 border-slate-200'
                         }`}
-                        title={image.excludeWatermark ? 'Descargar foto sin marca de agua (Descarga autorizada)' : 'Descargar archivo en alta resolución'}
+                        title={(image.isFinalSelection || (image.tags || []).includes('Selección Final')) ? 'Descargar Selección Final en Máxima Resolución (Sin Marcas)' : image.excludeWatermark ? 'Descargar foto sin marca de agua (Descarga autorizada)' : 'Descargar archivo en alta resolución'}
                       >
                         <Download className="w-4 h-4" />
                       </button>
@@ -1141,13 +1229,13 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
       </div>
 
-      {/* Lightbox Modal */}
+      {/* Lightbox Modal with reactive state & sync */}
       {selectedImage && (
         <PhotoLightbox
           image={selectedImage}
           images={displayedImages}
           currentUser={currentUser}
-          canDownload={canDownload}
+          canDownload={canDownload || filterMode === 'final_selection'}
           canFavorite={canFavorite}
           gallery={gallery}
           onUpdateImage={onUpdateImage}
@@ -1155,14 +1243,24 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
           branding={branding}
           onClose={() => setSelectedImage(null)}
           onSelectImage={(img) => setSelectedImage(img)}
-          onToggleFavorite={onToggleFavorite}
+          onToggleFavorite={(imgId) => {
+            onToggleFavorite(imgId);
+            setSelectedImage(prev => {
+              if (!prev || !isSameId(prev.id, imgId)) return prev;
+              const isFav = (prev.favoriteByUsers || []).some(id => isSameId(id, effectiveUserId));
+              const updatedFavs = isFav
+                ? (prev.favoriteByUsers || []).filter(id => !isSameId(id, effectiveUserId))
+                : [...(prev.favoriteByUsers || []), effectiveUserId];
+              return { ...prev, favoriteByUsers: updatedFavs };
+            });
+          }}
         />
       )}
 
       {/* Batch ZIP Download Progress Modal */}
       <BatchDownloadModal
         isOpen={isBatchModalOpen}
-        totalPhotos={filterMode === 'favorites' ? clientFavorites.length : galleryImages.length}
+        totalPhotos={filterMode === 'final_selection' ? finalSelectionImages.length : filterMode === 'favorites' ? clientFavorites.length : galleryImages.length}
         totalBytes={totalGalleryBytes}
         progressPercent={batchProgress}
         currentFileName={batchCurrentFile}

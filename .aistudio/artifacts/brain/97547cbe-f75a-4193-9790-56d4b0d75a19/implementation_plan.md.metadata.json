@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para corregir el estado activo y color del botón de favoritas en el portal de clientes, actualizar la vista previa en tiempo real en la configuración de marca al nuevo diseño del Hero y agregar barra de porcentaje animada con notificación de éxito en la subida de fotos.",
-  "updatedAt":  "2026-09-28T00:23:00.470310097Z",
+  "summary":  "Plan de implementación para corregir el botón de favoritos en el Lightbox, incorporar pestañas de 'Imágenes sin edición' y 'Selección Final' en el modal de subida de fotos, habilitar la pestaña 'Selección Final' en la barra de navegación del cliente con descargas en máxima resolución por defecto, y mostrar la pestaña de Selección Final en el perfil del cliente.",
+  "updatedAt":  "2026-09-28T00:52:45.089547091Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

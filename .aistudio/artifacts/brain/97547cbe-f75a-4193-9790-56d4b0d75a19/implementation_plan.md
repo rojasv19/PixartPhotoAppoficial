@@ -1,67 +1,79 @@
-# Plan de Implementación: Botón de Favoritas, Vista Previa del Hero y Barra de Progreso de Subida
+# Plan de Implementación: Botón de Favoritos en Lightbox, Modal de Subida con Pestañas y Flujo de Selección Final
 
 ## Resumen Ejecutivo
-Se implementarán tres soluciones concretas para optimizar la interacción del cliente y del administrador:
-1. **Feedback Visual y Cambio de Color en Botón de Favoritas:** Solucionar el problema por el cual el corazón de favoritas no cambiaba de color en la vista de cliente (debido a la discrepancia entre IDs de sesión de invitados/PIN y UUIDs en InstantDB). Ahora el botón se iluminará inmediatamente en tono rosa/carmesí (`bg-rose-600` con corazón relleno) al hacer clic, con retroalimentación táctil y toast de confirmación.
-2. **Actualización de la Vista Previa en Tiempo Real (Admin Branding):** Sincronizar el lienzo de previsualización en vivo en el panel de Marca/Personalización para que coincida exactamente con el nuevo diseño del Hero a pantalla completa (`100vw`/`100vh`), eliminando la barra de búsqueda del Hero y ubicando el menú de galerías con su buscador contiguo tal como luce en el portal público.
-3. **Barra de Porcentaje y Notificación en Subida de Fotos:** Incorporar en el modal de carga de imágenes una barra de progreso animada con porcentaje en tiempo real (`0%` a `100%`) que procese las fotografías agregadas o arrastradas al hacer clic en el botón de confirmación, culminando con una notificación de éxito que confirme que las fotos se subieron correctamente.
+Se implementarán las 4 funcionalidades clave requeridas por el usuario:
+1. **Corrección definitiva del botón de favoritos en el Lightbox:** Sincronizar el estado del `selectedImage` en `GalleryView` y `PhotoLightbox` mediante resolución reactiva con `isSameId` e intercalación optimista para que al hacer clic en el botón de favorita del lightbox cambie de color a rojo/rosa vibrante y actualice su estado al instante.
+2. **Pestañas en el modal de subida de imágenes:**
+   - **"Imágenes sin edición":** Flujo habitual de fotos para revisión y preselección.
+   - **"Selección Final":** Fotografías procesadas y retocadas con marca `isFinalSelection: true` y etiqueta `'Selección Final'`.
+3. **Nueva pestaña "Selección Final" en la barra de navegación del cliente:**
+   - Ubicada junto a "Todas" y "Favoritas" en `GalleryView`.
+   - Muestra las fotografías definitivas aprobadas.
+   - Habilita por defecto la descarga en máxima resolución (High-Res) sin restricciones ni bloqueos.
+   - Incorpora botón directo de descarga masiva en ZIP para la Selección Final.
+4. **Pestaña de "Selección Final" dentro del perfil del cliente (`UserProfileModal`):**
+   - Agrega un selector de pestañas dentro de "Mi Perfil & Cuenta": pestaña de datos personales y pestaña de "Selección Final" donde el cliente puede consultar y descargar sus fotos finales entregadas de todas sus sesiones activas.
 
 ---
 
 ## Decisiones Críticas y Arquitectura
 
 > [!IMPORTANT]
-> **Compatibilidad de IDs para Favoritas:** Tanto si el cliente ha iniciado sesión formalmente como si accede mediante PIN de galería como invitado (`usr-guest`), la condición de favorita verificará `isSameId(favUserId, targetUserId)` en `GalleryView` y `PhotoLightbox`, garantizando que el corazón cambie de color de forma inmediata y persista tanto en la nube (InstantDB) como en el estado local de React.
+> **Reactividad del Lightbox:** El lightbox recibía una copia inmutable congelada (`selectedImage`) que no se actualizaba cuando `App.tsx` mutaba el estado general de fotos. Al resolver dinámicamente `currentImg = images.find(i => isSameId(i.id, image.id))` y aplicar un toggle optimista en `GalleryView`, el botón del lightbox reacciona en 0ms.
 
-1. **Optimismo Visual Inmediato:** Al hacer clic en el botón de favoritas, el estado de la fotografía cambiará al instante en la interfaz antes de esperar la respuesta del servidor, brindando retroalimentación instantánea con microanimación.
-2. **Fidelidad 1:1 en Vista Previa:** La vista previa en `AdminBrandingSettings` reflejará la tipografía seleccionada, los colores del badge y resaltado, el degradado inferior y la nueva barra de sesiones sin buscador en el Hero.
-3. **Simulación de Carga Realista con Porcentaje:** Durante la subida en el modal, se calculará el porcentaje acumulado por archivo, mostrando el progreso fluido y deshabilitando envíos duplicados hasta concluir con el mensaje de confirmación.
+1. **Tipado y Persistencia de `isFinalSelection`:**
+   - En `types.ts`, extender `GalleryImage` con `isFinalSelection?: boolean`.
+   - En `instantDbService.ts`, persistir `isFinalSelection` en `uploadImageToDb` y `updateImageInDb`.
+2. **Descarga en Máxima Resolución por Defecto:**
+   - Para toda imagen con `isFinalSelection: true` o en el modo `filterMode === 'final_selection'`, el permiso `canDownload` se fuerza a `true` y el selector de descarga ofrece la descarga de alta resolución directamente.
+3. **Flujo de Carga en 2 Pestañas:**
+   - En `AdminDashboard.tsx`, el modal de subida presenta dos pestañas visuales con iconos, badges e instrucciones claras para el fotógrafo.
 
 ---
 
-## 1. Cambios Específicos por Módulo
+## 1. Módulos y Cambios Específicos
 
-### A. `src/components/GalleryView.tsx` y `src/components/PhotoLightbox.tsx`
-- **Cálculo de `isFav`:**
-  - Definir `targetUserId = currentUser?.id || 'usr-guest'`.
-  - Comprobar pertenencia usando `(image.favoriteByUsers || []).some(id => isSameId(id, targetUserId))`.
-  - Asegurar que `canFavorite` permita marcar favoritas tanto a usuarios registrados como a invitados autorizados por PIN.
-- **Estilo visual activo:**
-  - Cuando `isFav` sea verdadero: fondo `bg-rose-600 text-white fill-current shadow-lg shadow-rose-600/30 scale-110`.
-  - Cuando sea falso: `bg-slate-950/70 text-slate-300 hover:text-rose-400 hover:bg-slate-900`.
-- **Aviso Toast y contador de selección:**
-  - Mostrar una pequeña animación o mensaje flotante ("Añadida a tus favoritas") al marcar la foto para despejar cualquier duda del cliente.
+### A. `src/types.ts`
+- Agregar `isFinalSelection?: boolean;` a la interfaz `GalleryImage`.
 
-### B. `src/App.tsx`
-- **Mapeo de Usuario en `handleToggleFavorite`:**
-  - Si `currentUser` no existe, usar el identificador de invitado asignado a la sesión (`usr-guest` o enlace de la galería actual).
-  - Almacenar el UUID en `favoriteByUsers` de manera uniforme para sincronizarse perfectamente con InstantDB.
+### B. `src/services/instantDbService.ts`
+- Sincronizar el campo `isFinalSelection` en `uploadImageToDb` y `updateImageInDb`.
 
-### C. `src/components/AdminBrandingSettings.tsx`
-- **Eliminar el buscador interior del Hero:**
-  - Retirar el `input` de búsqueda del contenedor del Hero en la "Vista Previa en Tiempo Real".
-- **Alinear con el nuevo diseño del portal:**
-  - Agregar bajo el Hero el bloque de cabecera de "Galerías de Sesiones Fotográficas" con la barra de búsqueda y selector de categorías idéntico al de `PublicClientPortal.tsx`.
-  - Garantizar que los ajustes de opacidad, blur, tipografía y colores se reflejen con total exactitud.
+### C. `src/components/PhotoLightbox.tsx` & `src/components/GalleryView.tsx`
+- **En `PhotoLightbox.tsx`:**
+  - Resolver la imagen activa desde la colección viva: `const activeImg = images.find(img => isSameId(img.id, image?.id)) || image;`.
+  - Evaluar `isFavorite` sobre `activeImg.favoriteByUsers` usando `isSameId(favId, effectiveUserId)`.
+  - Si la imagen es `isFinalSelection`, asegurar que la opción de descarga esté habilitada en máxima resolución.
+- **En `GalleryView.tsx`:**
+  - Wrapper en `onToggleFavorite` que actualiza concurrentemente `selectedImage` en el estado local si el lightbox está abierto.
+  - Añadir botón de filtro `"Selección Final ({finalSelectionImages.length})"` junto a `"Todas"` y `"Favoritas"`.
+  - Implementar vista filtrada y botón de descarga de ZIP para la Selección Final.
 
 ### D. `src/components/AdminDashboard.tsx`
-- **Modal de Subida de Fotografías (`UploadImageModal`):**
-  - Añadir estados: `uploadProgress` (número del 0 al 100), `isUploadingWithProgress` (boolean) y `uploadSuccessNotification` (boolean).
-  - Al hacer clic en el botón de confirmación ("Selecciona Fotografías" / "Subir Fotografías al Servidor"):
-    - Si no hay fotos pendientes en la lista, abrir el selector nativo de archivos.
-    - Si ya hay fotos arrastradas o agregadas, iniciar la barra de porcentaje con transición fluida de `0%` a `100%`.
-    - Al llegar al `100%`: ejecutar `onUploadImage` para cada fotografía, mostrar una alerta verde destacada: *"¡Las fotografías fueron subidas correctamente al servidor!"*, y cerrar el modal tras 1.5 segundos con limpieza de archivos pendientes.
+- En el modal de subida de imágenes a la galería:
+  - Añadir selector de pestañas: `uploadTab: 'raw' | 'final'` ("Imágenes sin edición" vs "Selección Final").
+  - Al subir fotos en la pestaña "Selección Final", adjuntar automáticamente `isFinalSelection: true` y la etiqueta `Selección Final`.
+
+### E. `src/components/UserProfileModal.tsx` & `src/App.tsx`
+- En `UserProfileModal.tsx`:
+  - Agregar pestañas en la cabecera del modal: `"Mis Datos"` y `"Selección Final"`.
+  - En la pestaña "Selección Final", renderizar la galería de fotografías finales entregadas al cliente con previsualización y botón de descarga directa en máxima resolución.
+- En `App.tsx`:
+  - Pasar `images` y `galleries` a `UserProfileModal`.
 
 ---
 
 ## 2. Plan de Verificación
-1. **Verificación de Compilación:** Ejecutar `compile_applet` y `lint_applet` (`tsc --noEmit`).
-2. **Prueba de Favoritas en Portal de Clientes:**
-   - Abrir una galería como cliente/invitado y pulsar el corazón en varias fotos.
-   - Comprobar que cambie inmediatamente a color rojo/rosa con corazón relleno y el contador "Favoritas (X)" se actualice.
-   - Abrir la foto en la Lightbox y verificar que el botón refleje el estado activo.
-3. **Prueba de Vista Previa en Tiempo Real:**
-   - Ir a Administración -> Marca / Personalización y comprobar que la vista previa refleje el Hero sin barra de búsqueda interna y con la barra de menú exterior.
-4. **Prueba de Subida con Barra de Porcentaje:**
-   - En el panel de administración, abrir el modal de subida de fotos, arrastrar o seleccionar archivos y presionar el botón de subida.
-   - Observar la barra de porcentaje incrementando de 0% a 100% y la notificación de confirmación de subida exitosa.
+1. **Verificación de tipos y linting:**
+   - Ejecutar `lint_applet` (`tsc --noEmit`).
+2. **Prueba del Lightbox:**
+   - Abrir una fotografía en el visor Lightbox y hacer clic en el botón de favorita.
+   - Confirmar que cambia de color inmediatamente a rojo/rosa vibrante y muestra "En Favoritos", y que al cerrarlo la tarjeta en la galería también refleja el corazón activo.
+3. **Prueba de Subida con Pestañas:**
+   - Abrir el modal de subir imágenes en el panel de administración.
+   - Alternar entre "Imágenes sin edición" y "Selección Final". Subir una foto en "Selección Final" y verificar la barra de porcentaje y notificación de éxito.
+4. **Prueba de Navegación del Cliente:**
+   - En la vista de la sesión del cliente, verificar la nueva pestaña "Selección Final".
+   - Comprobar que solo muestra las fotos finales y permite descargarlas en alta resolución.
+5. **Prueba del Perfil del Cliente:**
+   - Abrir el modal de perfil del cliente y acceder a la pestaña "Selección Final".

@@ -1172,6 +1172,12 @@ export default function App() {
         onSaveUser={handleUpdateUser}
         theme={theme}
         branding={branding}
+        images={images}
+        galleries={galleries}
+        onOpenGallery={(galId) => {
+          handleOpenGallery(galId);
+          setIsProfileModalOpen(false);
+        }}
       />
 
     </div>
