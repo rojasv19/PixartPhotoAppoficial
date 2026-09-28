@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para corregir la eliminación de favoritas y la resolución de nombres de clientes en el panel de administración, reubicar la barra de búsqueda hacia el encabezado de sesiones y expandir la sección Hero a 100vw y 100vh en el portal de clientes.",
-  "updatedAt":  "2026-09-27T23:51:17.264738951Z",
+  "summary":  "Plan de implementación para corregir el estado activo y color del botón de favoritas en el portal de clientes, actualizar la vista previa en tiempo real en la configuración de marca al nuevo diseño del Hero y agregar barra de porcentaje animada con notificación de éxito en la subida de fotos.",
+  "updatedAt":  "2026-09-28T00:23:00.470310097Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

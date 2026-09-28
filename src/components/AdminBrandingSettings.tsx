@@ -497,8 +497,8 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               }`} 
             />
 
-            {/* Actual Hero Content Preview (1:1 with PublicClientPortal, centered dynamically) */}
-            <div className="px-6 py-10 sm:py-14 text-center space-y-4 relative z-10 flex flex-col items-center justify-center min-h-[220px]">
+            {/* Actual Hero Content Preview (1:1 with PublicClientPortal 100vw/100vh layout, centered dynamically) */}
+            <div className="px-6 py-12 sm:py-16 text-center space-y-4 relative z-10 flex flex-col items-center justify-center my-auto min-h-[260px]">
               {/* Badge (only rendered if text is present) */}
               {formData.portalHeroBadge && formData.portalHeroBadge.trim().length > 0 && (
                 <div 
@@ -514,13 +514,13 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
               {((formData.portalHeroTitle && formData.portalHeroTitle.trim().length > 0) || 
                 (formData.portalHeroHighlight && formData.portalHeroHighlight.trim().length > 0)) && (
                 <h3 
-                  className="text-xl sm:text-3xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-sm text-white"
+                  className="text-2xl sm:text-4xl font-bold font-serif-display leading-tight max-w-xl mx-auto drop-shadow-md text-white"
                   style={typographyToStyle(formData.customTypographyMap?.portalHeroTitle || formData.customTypographyMap?.globalHeading)}
                 >
                   {formData.portalHeroTitle && <span>{formData.portalHeroTitle} </span>}
                   {formData.portalHeroHighlight && formData.portalHeroHighlight.trim().length > 0 && (
                     <span 
-                      className={`${formData.portalHeroHighlightColor ? '' : activeColorTheme.twText} italic drop-shadow-sm`}
+                      className={`${formData.portalHeroHighlightColor ? '' : activeColorTheme.twText} italic drop-shadow-md`}
                       style={{
                         ...typographyToStyle(formData.portalHeroHighlightTypography || formData.customTypographyMap?.portalHeroHighlight),
                         color: formData.portalHeroHighlightColor || formData.portalHeroHighlightTypography?.color || undefined,
@@ -541,13 +541,45 @@ export const AdminBrandingSettings: React.FC<AdminBrandingSettingsProps> = ({
                   {formData.portalHeroSubtitle}
                 </p>
               )}
+            </div>
 
-              {/* Quick Search bar matching real hero */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm mx-auto">
-                <div className="relative w-full">
-                  <div className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl pl-9 pr-4 py-2 text-[11px] text-white/70 shadow-lg flex items-center justify-between pointer-events-none">
-                    <span className="text-slate-400">Buscar sesión, locación o evento...</span>
-                    <Search className="w-3.5 h-3.5 text-slate-400" />
+            {/* Miniature preview of the new Galleries Bar with Search in Menu Bar */}
+            <div className={`relative z-10 px-4 py-3 border-t transition-colors ${
+              isDark ? 'bg-[#0F1012]/95 border-slate-800 text-slate-200' : 'bg-white/95 border-slate-200 text-slate-800'
+            }`}>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pb-2">
+                <div>
+                  <h4 className="text-xs font-bold font-serif-display flex items-center gap-1.5">
+                    <span>Galerías de Sesiones Fotográficas</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-sans font-normal">
+                      Vista previa menú
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    Buscador reubicado en la barra de menú junto a las categorías
+                  </p>
+                </div>
+
+                {/* Search Bar + Categories Pill Selector in the Menu Bar */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-44">
+                    <div className={`w-full text-[10px] rounded-lg pl-7 pr-2 py-1 border flex items-center ${
+                      isDark ? 'bg-stone-900 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                    }`}>
+                      <span>Buscar sesión...</span>
+                    </div>
+                    <Search className="w-3 h-3 text-slate-400 absolute left-2 top-1.5" />
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold text-white ${activeColorTheme.twBg}`}>
+                      Todas
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${
+                      isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      Bodas
+                    </span>
                   </div>
                 </div>
               </div>

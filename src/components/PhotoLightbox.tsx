@@ -8,6 +8,7 @@ import { formatBytes, downloadSingleImage } from '../services/storageService';
 import { COLOR_PRESET_MAP } from '../services/brandingService';
 import { WatermarkOverlay } from './WatermarkOverlay';
 import { ImagePositionPicker } from './ImagePositionPicker';
+import { isSameId } from '../services/instantDbService';
 
 interface PhotoLightboxProps {
   image: GalleryImage | null;
@@ -123,7 +124,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     if (hasNext) onSelectImage(images[currentIndex + 1]);
   };
 
-  const isFavorite = currentUser ? image.favoriteByUsers.includes(currentUser.id) : false;
+  const effectiveUserId = currentUser?.id || gallery?.clientIds?.[0] || 'usr-guest';
+  const isFavorite = (image.favoriteByUsers || []).some(favId => isSameId(favId, effectiveUserId));
 
   const handleDownload = async (type: 'high-res' | 'web-res') => {
     setDownloadingType(type);

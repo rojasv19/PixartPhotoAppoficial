@@ -15,6 +15,7 @@ import { WatermarkOverlay } from './WatermarkOverlay';
 import { TypographyControl } from './TypographyControl';
 import { typographyToStyle } from '../services/googleFontsService';
 import { ImagePositionPicker, getImagePositionStyle } from './ImagePositionPicker';
+import { isSameId } from '../services/instantDbService';
 
 interface GalleryViewProps {
   gallery: GallerySession;
@@ -116,11 +117,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     return images.filter(img => img.galleryId === gallery.id);
   }, [images, gallery.id]);
 
+  const effectiveUserId = useMemo(() => {
+    return currentUser?.id || gallery.clientIds?.[0] || 'usr-guest';
+  }, [currentUser, gallery.clientIds]);
+
   // Client Favorites
   const clientFavorites = useMemo(() => {
-    if (!currentUser) return [];
-    return galleryImages.filter(img => img.favoriteByUsers.includes(currentUser.id));
-  }, [galleryImages, currentUser]);
+    return galleryImages.filter(img => 
+      (img.favoriteByUsers || []).some(favId => isSameId(favId, effectiveUserId))
+    );
+  }, [galleryImages, effectiveUserId]);
 
   // Unique tags for filter
   const allTags = useMemo(() => {
@@ -668,7 +674,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
             : 'grid-cols-1 md:grid-cols-2'
         }`}>
           {displayedImages.map((image, idx) => {
-            const isFav = currentUser ? image.favoriteByUsers.includes(currentUser.id) : false;
+            const isFav = (image.favoriteByUsers || []).some(favId => isSameId(favId, effectiveUserId));
             return (
               <div
                 key={image.id}

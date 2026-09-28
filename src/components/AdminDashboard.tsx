@@ -275,6 +275,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadSuccessNotification, setUploadSuccessNotification] = useState<{
+    show: boolean;
+    count: number;
+    galleryTitle: string;
+  } | null>(null);
 
   // Client Deletion Confirmation Modal State
   const [clientToDelete, setClientToDelete] = useState<User | null>(null);
@@ -636,41 +642,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPendingUploadFiles([]);
   };
 
-  // Submit Multiple Real Images Upload Safely
+  // Submit Multiple Real Images Upload Safely with Animated Progress and Notification
   const handleUploadImageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadGalleryId || pendingUploadFiles.length === 0 || isSubmittingBatch) return;
 
     setIsSubmittingBatch(true);
+    setUploadProgress(12);
+    setUploadSuccessNotification(null);
+
     const targetGalId = uploadGalleryId;
     const items = [...pendingUploadFiles];
+    const targetGallery = galleries.find(g => g.id === targetGalId);
+    const galleryTitle = targetGallery?.title || 'Galería';
 
-    try {
-      items.forEach(item => {
-        onUploadImage(targetGalId, {
-          title: item.title,
-          url: item.previewUrl,
-          highResUrl: item.previewUrl,
-          originalFileName: item.name,
-          fileSizeBytes: item.fileSizeBytes,
-          width: item.width,
-          height: item.height,
-          tags: ['RAW', 'Alta Resolución'],
-          cameraModel: item.cameraModel,
-          lens: item.lens,
-          focalLength: item.focalLength,
-          iso: item.iso,
-          shutterSpeed: item.shutterSpeed,
-          aperture: item.aperture,
+    let currentItem = 0;
+    const totalItems = items.length;
+
+    const interval = setInterval(() => {
+      currentItem += 1;
+      const percent = Math.min(Math.round((currentItem / (totalItems + 1)) * 100), 92);
+      setUploadProgress(percent);
+
+      if (currentItem >= totalItems) {
+        clearInterval(interval);
+        try {
+          items.forEach(item => {
+            onUploadImage(targetGalId, {
+              title: item.title,
+              url: item.previewUrl,
+              highResUrl: item.previewUrl,
+              originalFileName: item.name,
+              fileSizeBytes: item.fileSizeBytes,
+              width: item.width,
+              height: item.height,
+              tags: ['RAW', 'Alta Resolución'],
+              cameraModel: item.cameraModel,
+              lens: item.lens,
+              focalLength: item.focalLength,
+              iso: item.iso,
+              shutterSpeed: item.shutterSpeed,
+              aperture: item.aperture,
+            });
+          });
+        } catch (err) {
+          console.error('Error submitting batch images:', err);
+        }
+
+        setUploadProgress(100);
+        setIsSubmittingBatch(false);
+        setUploadSuccessNotification({
+          show: true,
+          count: totalItems,
+          galleryTitle,
         });
-      });
-    } catch (err) {
-      console.error('Error submitting batch images:', err);
-    }
 
-    setIsSubmittingBatch(false);
-    setUploadGalleryId(null);
-    setPendingUploadFiles([]);
+        // Keep success message visible for user to see
+        setTimeout(() => {
+          setUploadSuccessNotification(prev => {
+            if (prev?.show) {
+              setUploadProgress(0);
+              setUploadGalleryId(null);
+              setPendingUploadFiles([]);
+            }
+            return null;
+          });
+        }, 3200);
+      }
+    }, Math.max(100, Math.min(300, 1200 / totalItems)));
   };
 
   // Submit Feedback Reply
@@ -3457,6 +3496,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
 
+              {/* Upload Percentage Progress Bar & Success Notification */}
+              {(isSubmittingBatch || uploadSuccessNotification) && (
+                <div className={`p-4 rounded-2xl border transition-all animate-in fade-in duration-200 ${
+                  uploadSuccessNotification 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    : isDark ? 'bg-stone-950/80 border-stone-800 text-stone-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <div className="flex items-center justify-between text-xs mb-2 font-medium">
+                    <div className="flex items-center gap-2">
+                      {uploadSuccessNotification ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                      )}
+                      <span className="font-semibold">
+                        {uploadSuccessNotification 
+                          ? `¡Imágenes subidas correctamente! Se han agregado ${uploadSuccessNotification.count} fotografías a "${uploadSuccessNotification.galleryTitle}".`
+                          : `Subiendo fotografías al servidor...`
+                        }
+                      </span>
+                    </div>
+                    <span className="font-mono-code font-bold text-xs">{uploadProgress}%</span>
+                  </div>
+
+                  {/* Percentage progress bar */}
+                  <div className="w-full bg-stone-800/80 rounded-full h-3 overflow-hidden border border-stone-700/60 p-0.5">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-1 text-[9px] font-bold text-white ${
+                        uploadSuccessNotification 
+                          ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' 
+                          : 'bg-gradient-to-r from-blue-600 to-blue-400'
+                      }`}
+                      style={{ width: `${Math.max(uploadProgress, 4)}%` }}
+                    />
+                  </div>
+
+                  {uploadSuccessNotification && (
+                    <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-emerald-500/20 text-emerald-300">
+                      <span>Las fotografías ya están disponibles para los clientes y administradores.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadSuccessNotification(null);
+                          setUploadProgress(0);
+                          setUploadGalleryId(null);
+                          setPendingUploadFiles([]);
+                        }}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] cursor-pointer shadow-sm transition-all"
+                      >
+                        Aceptar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Actions Footer */}
               <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t ${
                 isDark ? 'border-stone-800' : 'border-slate-100'
@@ -3478,6 +3573,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={() => {
                       setUploadGalleryId(null);
                       setPendingUploadFiles([]);
+                      setUploadSuccessNotification(null);
+                      setUploadProgress(0);
                     }}
                     className={`px-4 py-2.5 rounded-xl text-xs cursor-pointer ${
                       isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-700'
@@ -3495,7 +3592,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {isSubmittingBatch ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Subiendo fotografías al servidor...</span>
+                        <span>Subiendo fotografías... ({uploadProgress}%)</span>
                       </>
                     ) : pendingUploadFiles.length === 0 ? (
                       'Selecciona Fotografías'

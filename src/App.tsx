@@ -554,18 +554,20 @@ export default function App() {
 
   // Photo Interactions
   const handleToggleFavorite = (imageId: string) => {
-    const userId = currentUser?.id || 'usr-guest';
-    const targetImage = images.find(img => img.id === imageId || toUuid(img.id) === toUuid(imageId));
+    const targetImage = images.find(img => isSameId(img.id, imageId));
     if (!targetImage) return;
 
+    const parentGal = galleries.find(g => isSameId(g.id, targetImage.galleryId));
+    const userId = currentUser?.id || parentGal?.clientIds?.[0] || 'usr-guest';
+
     const currentFavs = targetImage.favoriteByUsers || [];
-    const isFav = currentFavs.includes(userId) || currentFavs.includes(toUuid(userId));
+    const isFav = currentFavs.some(id => isSameId(id, userId));
     const userUuid = toUuid(userId);
     const updatedUsersList = isFav
-      ? currentFavs.filter(id => id !== userId && id !== userUuid)
+      ? currentFavs.filter(id => !isSameId(id, userId))
       : [...currentFavs, userUuid];
 
-    setLocalImages(prev => prev.map(img => img.id === targetImage.id ? { ...img, favoriteByUsers: updatedUsersList } : img));
+    setLocalImages(prev => prev.map(img => isSameId(img.id, targetImage.id) ? { ...img, favoriteByUsers: updatedUsersList } : img));
     toggleImageFavoriteInDb(targetImage.id, userId, currentFavs).catch(err => console.error('InstantDB toggle favorite error:', err));
 
     addAuditLog(
@@ -576,17 +578,16 @@ export default function App() {
 
     // Create a real-time notification for Admin when a client favorites an image
     if (!isFav) {
-      const parentGal = galleries.find(g => g.id === targetImage.galleryId || toUuid(g.id) === toUuid(targetImage.galleryId));
       handleAddNotification({
         title: 'Foto Marcada como Favorita',
-        message: `${currentUser?.name || 'Un cliente'} ha marcado "${targetImage.title}" como favorita para la selección final.`,
+        message: `${currentUser?.name || parentGal?.clientNames?.[0] || 'Un cliente'} ha marcado "${targetImage.title}" como favorita para la selección final.`,
         type: 'favorite',
         targetRole: 'admin',
         galleryId: parentGal?.id,
         galleryTitle: parentGal?.title,
         imageId: targetImage.id,
         imageUrl: targetImage.url,
-        actorName: currentUser?.name || 'Cliente',
+        actorName: currentUser?.name || parentGal?.clientNames?.[0] || 'Cliente',
         actorAvatar: currentUser?.avatar,
         linkView: 'admin-favorites',
       });
