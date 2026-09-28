@@ -460,6 +460,92 @@ export async function uploadImageToDb(image: GalleryImage) {
   ]);
 }
 
+/**
+ * Uploads a large batch of images to InstantDB in chunks (25 at a time)
+ * with controlled pacing and retry logic to handle 700+ images without WebSocket overload.
+ */
+export async function uploadImagesBatchToDb(
+  images: GalleryImage[],
+  onBatchProgress?: (completed: number, total: number, currentBatch: number, totalBatches: number) => void
+): Promise<{ success: number; failed: number }> {
+  if (!images || images.length === 0) return { success: 0, failed: 0 };
+
+  const CHUNK_SIZE = 25;
+  const chunks: GalleryImage[][] = [];
+  for (let i = 0; i < images.length; i += CHUNK_SIZE) {
+    chunks.push(images.slice(i, i + CHUNK_SIZE));
+  }
+
+  let totalSuccessful = 0;
+  let totalFailed = 0;
+
+  for (let batchIdx = 0; batchIdx < chunks.length; batchIdx++) {
+    const chunk = chunks[batchIdx];
+    let retries = 3;
+    let success = false;
+
+    while (retries > 0 && !success) {
+      try {
+        const mutations = chunk.map(image => {
+          const imageUuid = toUuid(image.id);
+          const galleryUuid = toUuid(image.galleryId);
+          const favUuids = (image.favoriteByUsers || []).map(uid => toUuid(uid));
+
+          return tx.images[imageUuid].update({
+            galleryId: galleryUuid,
+            title: image.title,
+            url: image.url,
+            highResUrl: image.highResUrl,
+            originalFileName: image.originalFileName,
+            fileSizeBytes: image.fileSizeBytes,
+            compressedSizeBytes: image.compressedSizeBytes || Math.round(image.fileSizeBytes * 0.18),
+            width: image.width,
+            height: image.height,
+            orientation: image.orientation,
+            cameraModel: image.cameraModel || '',
+            lens: image.lens || '',
+            focalLength: image.focalLength || '',
+            iso: image.iso || 100,
+            shutterSpeed: image.shutterSpeed || '1/1000s',
+            aperture: image.aperture || 'f/1.8',
+            favoriteByUsers: favUuids,
+            tags: image.tags || [],
+            uploadedAt: image.uploadedAt,
+            optimized: image.optimized,
+            clientNote: image.clientNote || '',
+            excludeWatermark: !!image.excludeWatermark,
+            isFinalSelection: !!image.isFinalSelection,
+            imagePosition: image.imagePosition || 'center',
+          });
+        });
+
+        await db.transact(mutations);
+        success = true;
+        totalSuccessful += chunk.length;
+      } catch (err) {
+        retries--;
+        console.warn(`[InstantDB] Batch ${batchIdx + 1}/${chunks.length} failed, retries left: ${retries}`, err);
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 300));
+        } else {
+          totalFailed += chunk.length;
+        }
+      }
+    }
+
+    if (onBatchProgress) {
+      onBatchProgress(totalSuccessful, images.length, batchIdx + 1, chunks.length);
+    }
+
+    // Small delay between batches to permit smooth WebSocket event dispatch
+    if (batchIdx < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, 60));
+    }
+  }
+
+  return { success: totalSuccessful, failed: totalFailed };
+}
+
 export async function updateImageInDb(image: GalleryImage) {
   const imageUuid = toUuid(image.id);
   const galleryUuid = toUuid(image.galleryId);

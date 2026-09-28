@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { GalleryImage, GallerySession, ServerStorageStats, User, AuditLogItem, AppNotification } from '../types';
 import { INITIAL_USERS, INITIAL_GALLERIES, INITIAL_IMAGES, INITIAL_AUDIT_LOGS, INITIAL_NOTIFICATIONS } from '../data/initialData';
 import { isSameId } from './instantDbService';
+import { saveImagesBatchToIndexedDb } from './indexedDbService';
 
 const STORAGE_KEYS = {
   USERS: 'somos_pixart_users_v5',
@@ -491,6 +492,13 @@ export function loadImagesFromStorage(): GalleryImage[] {
 }
 
 export function saveImagesToStorage(images: GalleryImage[]) {
+  // Always persist all images to high-capacity IndexedDB (supports gigabytes and 700+ images without limits)
+  if (Array.isArray(images) && images.length > 0) {
+    saveImagesBatchToIndexedDb(images).catch(err => {
+      console.error('[StorageService] Error saving images to IndexedDB:', err);
+    });
+  }
+
   try {
     // Try saving directly if payload is reasonable
     const directPayload = JSON.stringify(images);
@@ -514,7 +522,7 @@ export function saveImagesToStorage(images: GalleryImage[]) {
 
     safeSetItem(STORAGE_KEYS.IMAGES, JSON.stringify(sanitizedImages));
   } catch (err) {
-    console.warn('Notice: browser localStorage quota reached; image cache skipped. In-memory state and cloud sync remain active.', err);
+    // Expected for massive image uploads; IndexedDB acts as the authoritative high-capacity store
   }
 }
 
@@ -596,12 +604,6 @@ export function saveStoredAuthUser(user: User | null) {
  */
 export function cleanupStaleStorage() {
   try {
-    const imagesCache = localStorage.getItem(STORAGE_KEYS.IMAGES);
-    if (imagesCache && imagesCache.length > 500000) {
-      // Images cache is larger than 500KB; purge it so it doesn't starve quota
-      localStorage.removeItem(STORAGE_KEYS.IMAGES);
-      console.log('[SafeStorage] Proactively purged heavy image cache from localStorage to keep app fast and stable.');
-    }
     // Clean up phantom demo notifications
     const notifs = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
     if (notifs) {

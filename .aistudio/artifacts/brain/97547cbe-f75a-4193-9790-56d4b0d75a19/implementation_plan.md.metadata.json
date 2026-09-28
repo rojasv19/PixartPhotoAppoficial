@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan para integrar una barra de búsqueda en tiempo real dentro de la barra de navegación de la galería (junto a las pestañas 'Todas', 'Favoritas' y 'Selección Final'), con soporte de filtrado multicriterio por título, nombre de archivo, número de imagen y etiquetas.",
-  "updatedAt":  "2026-09-28T15:41:42.678119884Z",
+  "summary":  "Plan integral de solución para la carga masiva y persistencia de cientos de imágenes (más de 700 fotos): almacenamiento ilimitado con IndexedDB para evitar el límite de 5MB de localStorage, eliminación de la purga destructiva de caché, y canalización de subida por lotes (batches) a InstantDB con barra de progreso detallada y reintentos.",
+  "updatedAt":  "2026-09-28T17:48:55.557073731Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

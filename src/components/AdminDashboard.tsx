@@ -52,6 +52,28 @@ interface AdminDashboardProps {
     shutterSpeed?: string;
     aperture?: string;
   }) => void;
+  onUploadImagesBatch?: (
+    galleryId: string, 
+    imageFiles: Array<{
+      title: string; 
+      url: string; 
+      highResUrl: string; 
+      originalFileName: string; 
+      fileSizeBytes: number; 
+      width: number; 
+      height: number; 
+      tags: string[];
+      isFinalSelection?: boolean;
+      excludeWatermark?: boolean;
+      cameraModel?: string;
+      lens?: string;
+      focalLength?: string;
+      iso?: number;
+      shutterSpeed?: string;
+      aperture?: string;
+    }>,
+    onProgress?: (percent: number, statusText: string) => void
+  ) => Promise<{ count: number; galleryTitle: string }>;
   onDeleteImage: (imageId: string) => void;
   onDeleteAllImagesInGallery?: (galleryId: string) => void;
   onUpdateImage?: (updatedImage: GalleryImage) => void;
@@ -81,6 +103,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateUser,
   onDeleteUser,
   onUploadImage,
+  onUploadImagesBatch,
   onDeleteImage,
   onDeleteAllImagesInGallery,
   onBatchOptimizeImages,
@@ -258,28 +281,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+interface PendingUploadItem {
+  id: string;
+  name: string;
+  title: string;
+  fileSizeBytes: number;
+  sizeFormatted: string;
+  previewUrl: string;
+  width: number;
+  height: number;
+  cameraModel?: string;
+  lens?: string;
+  focalLength?: string;
+  iso?: number;
+  shutterSpeed?: string;
+  aperture?: string;
+}
+
   // Multiple Real File Upload State
-  const [pendingUploadFiles, setPendingUploadFiles] = useState<Array<{
-    id: string;
-    name: string;
-    title: string;
-    fileSizeBytes: number;
-    sizeFormatted: string;
-    previewUrl: string;
-    width: number;
-    height: number;
-    cameraModel?: string;
-    lens?: string;
-    focalLength?: string;
-    iso?: number;
-    shutterSpeed?: string;
-    aperture?: string;
-  }>>([]);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<PendingUploadItem[]>([]);
   const [isDragOverUpload, setIsDragOverUpload] = useState<boolean>(false);
   const [isProcessingUploads, setIsProcessingUploads] = useState<boolean>(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadTab, setUploadTab] = useState<'raw' | 'final'>('raw');
+  const [uploadStatusMessage, setUploadStatusMessage] = useState<string>('');
+  const [processingText, setProcessingText] = useState<string>('');
   const [uploadSuccessNotification, setUploadSuccessNotification] = useState<{
     show: boolean;
     count: number;
@@ -602,46 +629,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  // Process Multiple Files For Upload
+  // Process Multiple Files For Upload in responsive chunks of 25 to prevent browser freezing with 700+ images
   const processFilesForUpload = async (files: FileList | File[]) => {
     const fileList = Array.from(files).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|tiff?|cr3|arw|nef|raw|dng)$/i.test(f.name));
     if (fileList.length === 0) return;
 
     setIsProcessingUploads(true);
+    setProcessingText(`Analizando 0 de ${fileList.length} fotografías...`);
 
     try {
-      const results = await Promise.all(
-        fileList.map(async (file) => {
-          const [processed, exif] = await Promise.all([
-            processImageFile(file),
-            extractExifFromFile(file)
-          ]);
-          const originalName = file.name;
-          const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-          return {
-            id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            name: originalName,
-            title: title || 'Fotografía',
-            fileSizeBytes: file.size,
-            sizeFormatted: formatBytes(file.size),
-            previewUrl: processed.thumbnailUrl,
-            width: exif.width || processed.width,
-            height: exif.height || processed.height,
-            cameraModel: exif.cameraModel,
-            lens: exif.lens,
-            focalLength: exif.focalLength,
-            iso: exif.iso,
-            shutterSpeed: exif.shutterSpeed,
-            aperture: exif.aperture,
-          };
-        })
-      );
+      const CHUNK_SIZE = 25;
+      const allResults: PendingUploadItem[] = [];
 
-      setPendingUploadFiles(prev => [...prev, ...results]);
+      for (let i = 0; i < fileList.length; i += CHUNK_SIZE) {
+        const slice = fileList.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          slice.map(async (file) => {
+            const [processed, exif] = await Promise.all([
+              processImageFile(file),
+              extractExifFromFile(file)
+            ]);
+            const originalName = file.name;
+            const title = originalName.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+            return {
+              id: `upl-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              name: originalName,
+              title: title || 'Fotografía',
+              fileSizeBytes: file.size,
+              sizeFormatted: formatBytes(file.size),
+              previewUrl: processed.thumbnailUrl,
+              width: exif.width || processed.width,
+              height: exif.height || processed.height,
+              cameraModel: exif.cameraModel,
+              lens: exif.lens,
+              focalLength: exif.focalLength,
+              iso: exif.iso,
+              shutterSpeed: exif.shutterSpeed,
+              aperture: exif.aperture,
+            };
+          })
+        );
+        allResults.push(...chunkResults);
+        setProcessingText(`Analizando ${allResults.length} de ${fileList.length} fotografías...`);
+        // Yield momentarily to browser UI loop
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      setPendingUploadFiles(prev => [...prev, ...allResults]);
     } catch (err) {
       console.error('Error processing upload files:', err);
     } finally {
       setIsProcessingUploads(false);
+      setProcessingText('');
     }
   };
 
@@ -653,13 +692,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setPendingUploadFiles([]);
   };
 
-  // Submit Multiple Real Images Upload Safely with Animated Progress and Notification
-  const handleUploadImageSubmit = (e: React.FormEvent) => {
+  // Submit Multiple Real Images Upload Safely with Real Batch Progress and Notification
+  const handleUploadImageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadGalleryId || pendingUploadFiles.length === 0 || isSubmittingBatch) return;
 
     setIsSubmittingBatch(true);
-    setUploadProgress(12);
+    setUploadProgress(5);
+    setUploadStatusMessage('Iniciando carga de fotografías...');
     setUploadSuccessNotification(null);
 
     const targetGalId = uploadGalleryId;
@@ -671,63 +711,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       ? ['Selección Final', 'Alta Resolución', 'Editado'] 
       : ['RAW', 'Sin Edición'];
 
-    let currentItem = 0;
-    const totalItems = items.length;
+    const uploadPayload = items.map(item => ({
+      title: item.title,
+      url: item.previewUrl,
+      highResUrl: item.previewUrl,
+      originalFileName: item.name,
+      fileSizeBytes: item.fileSizeBytes,
+      width: item.width,
+      height: item.height,
+      tags: defaultTags,
+      isFinalSelection: isFinal,
+      excludeWatermark: isFinal,
+      cameraModel: item.cameraModel,
+      lens: item.lens,
+      focalLength: item.focalLength,
+      iso: item.iso,
+      shutterSpeed: item.shutterSpeed,
+      aperture: item.aperture,
+    }));
 
-    const interval = setInterval(() => {
-      currentItem += 1;
-      const percent = Math.min(Math.round((currentItem / (totalItems + 1)) * 100), 92);
-      setUploadProgress(percent);
-
-      if (currentItem >= totalItems) {
-        clearInterval(interval);
-        try {
-          items.forEach(item => {
-            onUploadImage(targetGalId, {
-              title: item.title,
-              url: item.previewUrl,
-              highResUrl: item.previewUrl,
-              originalFileName: item.name,
-              fileSizeBytes: item.fileSizeBytes,
-              width: item.width,
-              height: item.height,
-              tags: defaultTags,
-              isFinalSelection: isFinal,
-              excludeWatermark: isFinal,
-              cameraModel: item.cameraModel,
-              lens: item.lens,
-              focalLength: item.focalLength,
-              iso: item.iso,
-              shutterSpeed: item.shutterSpeed,
-              aperture: item.aperture,
-            });
-          });
-        } catch (err) {
-          console.error('Error submitting batch images:', err);
-        }
+    if (onUploadImagesBatch) {
+      try {
+        const res = await onUploadImagesBatch(targetGalId, uploadPayload, (percent, statusText) => {
+          setUploadProgress(percent);
+          setUploadStatusMessage(statusText);
+        });
 
         setUploadProgress(100);
         setIsSubmittingBatch(false);
         setUploadSuccessNotification({
           show: true,
-          count: totalItems,
-          galleryTitle,
+          count: res.count,
+          galleryTitle: res.galleryTitle,
           isFinal,
         });
 
-        // Keep success message visible for user to see
         setTimeout(() => {
           setUploadSuccessNotification(prev => {
             if (prev?.show) {
               setUploadProgress(0);
               setUploadGalleryId(null);
               setPendingUploadFiles([]);
+              setUploadStatusMessage('');
             }
             return null;
           });
-        }, 3200);
+        }, 3500);
+      } catch (err) {
+        console.error('Batch upload error:', err);
+        setIsSubmittingBatch(false);
       }
-    }, Math.max(100, Math.min(300, 1200 / totalItems)));
+    } else {
+      // Fallback sequential dispatch
+      items.forEach(item => {
+        onUploadImage(targetGalId, {
+          title: item.title,
+          url: item.previewUrl,
+          highResUrl: item.previewUrl,
+          originalFileName: item.name,
+          fileSizeBytes: item.fileSizeBytes,
+          width: item.width,
+          height: item.height,
+          tags: defaultTags,
+          isFinalSelection: isFinal,
+          excludeWatermark: isFinal,
+          cameraModel: item.cameraModel,
+          lens: item.lens,
+          focalLength: item.focalLength,
+          iso: item.iso,
+          shutterSpeed: item.shutterSpeed,
+          aperture: item.aperture,
+        });
+      });
+
+      setUploadProgress(100);
+      setIsSubmittingBatch(false);
+      setUploadSuccessNotification({
+        show: true,
+        count: items.length,
+        galleryTitle,
+        isFinal,
+      });
+
+      setTimeout(() => {
+        setUploadSuccessNotification(prev => {
+          if (prev?.show) {
+            setUploadProgress(0);
+            setUploadGalleryId(null);
+            setPendingUploadFiles([]);
+          }
+          return null;
+        });
+      }, 3500);
+    }
   };
 
   // Submit Feedback Reply
@@ -3590,7 +3666,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {isProcessingUploads && (
                 <div className="flex items-center justify-center gap-2 text-xs text-amber-400 py-2">
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Procesando y calculando resolución de las fotografías...</span>
+                  <span>{processingText || 'Procesando y calculando resolución de las fotografías...'}</span>
                 </div>
               )}
 
@@ -3613,7 +3689,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ? uploadSuccessNotification.isFinal
                             ? `¡Selección Final subida con éxito! Se han agregado ${uploadSuccessNotification.count} fotografías definitivas a "${uploadSuccessNotification.galleryTitle}".`
                             : `¡Imágenes subidas correctamente! Se han agregado ${uploadSuccessNotification.count} fotografías a "${uploadSuccessNotification.galleryTitle}".`
-                          : `Subiendo fotografías al servidor...`
+                          : (uploadStatusMessage || `Subiendo fotografías al servidor...`)
                         }
                       </span>
                     </div>

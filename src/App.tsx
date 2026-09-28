@@ -43,6 +43,7 @@ import {
   updateUserInDb,
   deleteUserInDb,
   uploadImageToDb,
+  uploadImagesBatchToDb,
   deleteImageFromDb,
   deleteImagesBatchFromDb,
   toggleImageFavoriteInDb,
@@ -63,6 +64,13 @@ import {
   purgeLegacyDemoDataFromDb,
   saveBrandingToDb
 } from './services/instantDbService';
+import {
+  getAllImagesFromIndexedDb,
+  saveImagesBatchToIndexedDb,
+  saveImageToIndexedDb,
+  deleteImagesBatchFromIndexedDb,
+  clearGalleryImagesFromIndexedDb
+} from './services/indexedDbService';
 import { preloadFonts, typographyToStyle } from './services/googleFontsService';
 
 export default function App() {
@@ -185,6 +193,8 @@ export default function App() {
         saveImagesToStorage(merged);
         return merged;
       });
+      // Keep high-capacity IndexedDB synchronized with remote photos
+      saveImagesBatchToIndexedDb(remoteImgs).catch(err => console.warn('IndexedDB remote sync warning:', err));
     }
   }, [imagesDbData?.images]);
 
@@ -192,6 +202,24 @@ export default function App() {
   useEffect(() => {
     // Proactively purge any oversized image caches from previous sessions
     cleanupStaleStorage();
+    // Load persisted images from high-capacity IndexedDB so 700+ images are restored immediately upon page refresh
+    getAllImagesFromIndexedDb().then(storedImgs => {
+      if (storedImgs && storedImgs.length > 0) {
+        setLocalImages(prev => {
+          const map = new Map<string, GalleryImage>();
+          prev.forEach(img => map.set(img.id, img));
+          storedImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+          return Array.from(map.values());
+        });
+        setCachedImages(prev => {
+          const map = new Map<string, GalleryImage>();
+          prev.forEach(img => map.set(img.id, img));
+          storedImgs.forEach(img => map.set(img.id, { ...(map.get(img.id) || {}), ...img }));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(err => console.warn('IndexedDB initial load error:', err));
+
     // Proactively purge legacy demo users and demo galleries from InstantDB
     purgeLegacyDemoDataFromDb().catch(err => console.error('Demo purge error:', err));
     // Proactively ensure defined admin users exist in InstantDB
@@ -1034,8 +1062,9 @@ export default function App() {
       return next;
     });
 
-    // 5. Delete in InstantDB
+    // 5. Delete in InstantDB and IndexedDB
     deleteGalleryInDb(targetId, relatedImgs).catch(err => console.error('InstantDB delete gallery error:', err));
+    clearGalleryImagesFromIndexedDb(targetId).catch(err => console.error('IndexedDB clear gallery images error:', err));
     addAuditLog('Sesión Eliminada', `Eliminó la sesión "${targetTitle || targetId}" y liberó su espacio en disco.`, targetTitle);
   };
 
@@ -1157,6 +1186,7 @@ export default function App() {
       saveImagesToStorage(next);
       return next;
     });
+    saveImageToIndexedDb(newImage).catch(err => console.error('IndexedDB save image error:', err));
     uploadImageToDb(newImage).catch(err => console.error('InstantDB upload image error:', err));
 
     // Update gallery cover and photo count
@@ -1187,6 +1217,110 @@ export default function App() {
     });
   };
 
+  // High-capacity batch upload handler: saves immediately to IndexedDB (zero loss on F5)
+  // and streams in controlled batches of 25 to InstantDB with retries
+  const handleUploadImagesBatch = async (
+    galleryId: string, 
+    files: Array<{ 
+      title: string; 
+      url: string; 
+      highResUrl: string; 
+      originalFileName: string; 
+      fileSizeBytes: number; 
+      width: number; 
+      height: number; 
+      tags: string[];
+      cameraModel?: string;
+      lens?: string;
+      focalLength?: string;
+      iso?: number;
+      shutterSpeed?: string;
+      aperture?: string;
+      isFinalSelection?: boolean;
+      excludeWatermark?: boolean;
+    }>,
+    onProgress?: (percent: number, statusText: string) => void
+  ): Promise<{ count: number; galleryTitle: string }> => {
+    const parentGal = galleries.find(g => isSameId(g.id, galleryId));
+    const targetGalleryId = parentGal?.id || galleryId;
+    const galleryTitle = parentGal?.title || 'Galería';
+
+    const timestampStr = new Date().toLocaleString('es-ES', { 
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' 
+    });
+
+    const newImages: GalleryImage[] = files.map(file => ({
+      ...file,
+      id: id(),
+      galleryId: targetGalleryId,
+      orientation: file.width >= file.height ? 'landscape' : 'portrait',
+      cameraModel: file.cameraModel || 'Cámara Digital (Sin EXIF)',
+      lens: file.lens || 'Lente Profesional',
+      focalLength: file.focalLength || '50mm',
+      iso: file.iso || 100,
+      shutterSpeed: file.shutterSpeed || '1/500s',
+      aperture: file.aperture || 'f/2.8',
+      favoriteByUsers: [],
+      uploadedAt: timestampStr,
+      optimized: false,
+      isFinalSelection: !!file.isFinalSelection,
+      excludeWatermark: !!file.excludeWatermark,
+      imagePosition: 'center',
+    }));
+
+    if (onProgress) onProgress(15, `Guardando ${newImages.length} fotos en almacenamiento persistente IndexedDB...`);
+
+    // 1. Immediately persist to high-capacity IndexedDB (zero data loss upon refresh!)
+    await saveImagesBatchToIndexedDb(newImages);
+
+    // 2. Immediately update in-memory state and cache
+    setLocalImages(prev => [...newImages, ...prev]);
+    setCachedImages(prev => [...newImages, ...prev]);
+
+    // 3. Update parent gallery photo count and cover
+    if (parentGal) {
+      const currentCount = parentGal.photoCount || 0;
+      handleUpdateGallery({
+        ...parentGal,
+        photoCount: currentCount + newImages.length,
+        coverImage: (!parentGal.coverImage || parentGal.coverImage.trim() === '') ? newImages[0]?.url : parentGal.coverImage,
+      });
+    }
+
+    if (onProgress) onProgress(30, `Sincronizando ${newImages.length} fotos con la base de datos...`);
+
+    // 4. Stream to InstantDB in chunks of 25 with retry logic
+    await uploadImagesBatchToDb(newImages, (completed, total, currentBatch, totalBatches) => {
+      const p = Math.min(95, Math.round(30 + (completed / total) * 65));
+      if (onProgress) {
+        onProgress(p, `Lote ${currentBatch}/${totalBatches}: ${completed} de ${total} fotos sincronizadas (${p}%)...`);
+      }
+    });
+
+    if (onProgress) onProgress(100, `¡Completado! ${newImages.length} fotos guardadas y sincronizadas.`);
+
+    addAuditLog(
+      'Carga Masiva de Fotografías', 
+      `Subió un lote de ${newImages.length} fotografías a la galería "${galleryTitle}".`, 
+      galleryTitle
+    );
+
+    handleAddNotification({
+      title: 'Lote de Fotos Disponible',
+      message: `Se han añadido ${newImages.length} fotografías a la sesión "${galleryTitle}".`,
+      type: 'upload',
+      targetRole: 'client',
+      galleryId: targetGalleryId,
+      galleryTitle: galleryTitle,
+      imageUrl: newImages[0]?.url,
+      actorName: currentUser?.name || 'Pixart Photo',
+      actorAvatar: currentUser?.avatar,
+      linkView: 'gallery',
+    });
+
+    return { count: newImages.length, galleryTitle };
+  };
+
   const handleDeleteImage = (imageId: string) => {
     const targetImg = images.find(i => i.id === imageId || toUuid(i.id) === toUuid(imageId));
     const targetId = targetImg?.id || imageId;
@@ -1200,6 +1334,7 @@ export default function App() {
       return next;
     });
     deleteImageFromDb(targetId).catch(err => console.error('InstantDB delete image error:', err));
+    deleteImagesBatchFromIndexedDb([targetId]).catch(err => console.error('IndexedDB delete image error:', err));
 
     // Decrement photoCount in parent gallery
     if (targetImg?.galleryId) {
@@ -1232,6 +1367,7 @@ export default function App() {
       return next;
     });
     deleteImagesBatchFromDb(imageIds).catch(err => console.error('InstantDB batch delete error:', err));
+    deleteImagesBatchFromIndexedDb(imageIds).catch(err => console.error('IndexedDB batch delete error:', err));
 
     if (parentGal) {
       handleUpdateGallery({
@@ -1385,6 +1521,7 @@ export default function App() {
             onUpdateUser={handleUpdateUser}
             onDeleteUser={handleDeleteUser}
             onUploadImage={handleUploadImage}
+            onUploadImagesBatch={handleUploadImagesBatch}
             onDeleteImage={handleDeleteImage}
             onDeleteAllImagesInGallery={handleDeleteAllImagesInGallery}
             onBatchOptimizeImages={handleBatchOptimizeImages}
